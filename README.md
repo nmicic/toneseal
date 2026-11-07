@@ -1,8 +1,9 @@
 # ToneSeal
 
 **Experimental beta.** Short messages and secrets, carried by sound. ToneSeal
-provides a browser app with encrypted Message and Password modes, an explicit Clear text
-mode, and a signed-enrollment showcase. Message can stay connected for replies.
+provides a browser app and a native Linux/macOS C client with encrypted Message
+and Password modes, explicit Clear text, and continuing chat. The browser also
+includes a signed-enrollment showcase.
 
 Sound is rendered by [JotTune Synth](https://github.com/chimepond/jottune-synth).
 ToneSeal implements its own packet encoding, audio receiver, session protocol,
@@ -92,20 +93,25 @@ See [the wire protocol](PROTOCOL.md), [automatic operation](docs/AUTOMATIC-TRANS
 The renderer is an external dependency; its source is not vendored here.
 Local font assets retain their [licenses and provenance](web/fonts/README.md).
 
-## CLI and native status
+## Native C CLI
 
-The retained file CLI encodes clear-text messages to WAV and decodes recordings
-through the C receiver. It does not implement ToneSeal encrypted sessions or
-live microphone/speaker operation. See [CLI instructions](LEGACY.md).
+The C client implements live encrypted messaging, masked Password receive,
+acknowledged Clear text and bidirectional chat using the same browser protocols.
+It uses installed OpenSSL 3 and PortAudio libraries plus an external JotTune
+Synth checkout. No dependencies are vendored, and the executable needs no
+JavaScript runtime or network connection.
 
 ```sh
-python3 build.py
-node cli.mjs encode --text 'Hello' --out out/example --harness ../jottune-synth/build/s12e10p1v1/harness
-node cli.mjs decode --wav out/example/message.wav
+python3 scripts/build-cli.py --synth-root ../jottune-synth
+build/toneseal send --verify
+build/toneseal receive --verify
 ```
 
-The output directory must be new and its parent must exist. Full encrypted
-Linux/macOS clients and native mobile apps are future work.
+Run send and receive on different devices. See [native build, flow and automation
+instructions](docs/NATIVE-CLI.md) for required system packages, matching browser
+settings, chat, WAV diagnostics, JSON events and the test scope. Physical
+CLI-to-phone/browser testing and native mobile apps remain pending. The retained
+[JavaScript file CLI](LEGACY.md) is a separate cleartext diagnostic.
 
 ## Checks
 
@@ -118,7 +124,9 @@ npm test
 ```
 
 GitHub Actions runs these checks and session/chat simulations on Linux and
-macOS, including a Linux C sanitizer check. Full browser/acoustic checks remain
+macOS, including a Linux C sanitizer check. A separate native CLI job builds the
+external synth SDK and runs `npm run test:cli` with system crypto/audio libraries.
+Full browser/acoustic checks remain
 separate. The maintainer reports successful browser transfers on Android,
 Windows, iOS and macOS.
 

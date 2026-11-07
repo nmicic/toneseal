@@ -34,6 +34,31 @@ passwords, session keys, or microphone input.
 
 ## What each layer establishes
 
+The native C client has a separate suite:
+
+```sh
+JOTTUNE_SYNTH_ROOT=../jottune-synth npm run test:cli
+JOTTUNE_SYNTH_ROOT=../jottune-synth npm run test:cli -- --sanitize
+```
+
+It compares real OpenSSL and browser Web Crypto, then runs the production C
+controller against the production browser controller on one shared audio
+timeline. C time is explicitly injected; JavaScript timers and real crypto
+completions are coordinated before advancing virtual time. Scenarios include
+both roles, all three modes, chat, delayed starts, selective loss, duplicates,
+queue limits, simultaneous senders and confirmed/unconfirmed close. Fixed
+framing fixtures, counter exhaustion, replay-window edges, malformed WAVs,
+noisy/stereo PCM and real terminal IO have separate checks. Counter inspection
+is confined to a test executable, with no production counter/nonce overrides.
+
+On Linux, `TONESEAL_TEST_ALSA_NULL=1` opts into real PortAudio callback/lifecycle
+checks using a process-local ALSA null configuration. No system audio settings
+are changed. After building `dist/`, `npm run test:cli:pcm` additionally compares
+native/browser synth waveforms and routes complete protocol transfers through
+the real synths and opposite receivers. These are synthetic sound tests, not
+physical speaker/microphone or telephone acceptance. See
+[native instructions](NATIVE-CLI.md).
+
 `tests/simulated-transfer.mjs` runs the actual automatic controller, session
 cryptography, and framing on one virtual clock. Device A and B share a half
 duplex medium. Frames have their real encoded durations; the model accounts for

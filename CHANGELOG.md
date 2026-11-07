@@ -14,10 +14,15 @@ Initial public-source release, prepared for publication.
 - Original packet modem and portable C receiver, with sound rendered through
   the separately maintained JotTune Synth.
 - Diagnostic cleartext WAV CLI and standalone static-site build instructions.
+- Native Linux/macOS C client with installed OpenSSL 3/PortAudio and the external
+  JotTune Synth SDK: encrypted Message/Password, acknowledged Clear text, chat,
+  fingerprint verification, encrypted rekey, JSON events and WAV diagnostics.
+- Native/browser interoperability, shared-timeline loss/recovery tests, counter
+  boundaries, terminal safety and Linux null-device audio lifecycle checks.
 - Independent framing fixtures, protocol/acoustic simulations, browser checks,
   mobile-layout checks and Linux/macOS continuous integration configuration.
 
 The maintainer reports successful browser transfers on Android, Windows, iOS
 and macOS. Synthetic tests and browser emulation are documented separately.
-Telephone-call compatibility, independent security review, encrypted live native
-CLI and native mobile applications remain outside this beta's completed scope.
+Telephone-call compatibility, independent security review, physical CLI/device
+acceptance and native mobile applications remain outside the completed scope.

@@ -1,5 +1,8 @@
 # Clear-text file CLI
 
+For the live encrypted C client, use [the native CLI guide](docs/NATIVE-CLI.md).
+This page describes the retained JavaScript diagnostic tool.
+
 The original file experiment is retained as a diagnostic tool. It converts text
 into a JotTune timeline and WAV, and decodes a recorded WAV with ToneSeal's native
 C receiver. It is clear text, unauthenticated and has no pairing or delivery
@@ -36,7 +39,7 @@ build/receiver stream capture.pcm irregular
 ```
 
 Messages passed through `--text` are visible in process arguments. The CLI is
-for dummy clear-text tests, not passwords. An encrypted native client needs its
+for dummy clear-text tests, not passwords. The native C client implements its
 own session, replay, receipt and live-audio integration.
 
 ## Browser diagnostic

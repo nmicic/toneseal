@@ -46,3 +46,48 @@ jobs:
         env:
           CC: clang -fsanitize=address,undefined -fno-omit-frame-pointer
         run: node --test tests/codec-vectors.mjs
+
+  cli:
+    name: Native encrypted CLI (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    env:
+      JOTTUNE_SYNTH_ROOT: ${{ github.workspace }}/out/jottune-synth
+      TONESEAL_TEST_ALSA_NULL: ${{ matrix.os == 'ubuntu-latest' && '1' || '0' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: chimepond/jottune-synth
+          ref: d2997c99c01f5a1d75af6c2c68454a99d02356d6
+          path: out/jottune-synth
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+      - name: Install Linux system development libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends build-essential pkg-config libssl-dev portaudio19-dev
+      - name: Install macOS system development libraries
+        if: runner.os == 'macOS'
+        run: |
+          brew install pkgconf openssl@3 portaudio
+          echo "PKG_CONFIG_PATH=$(brew --prefix openssl@3)/lib/pkgconfig" >> "$GITHUB_ENV"
+      - name: Native crypto, timed recovery, WAV, terminal and callback checks
+        run: npm run test:cli
+      - name: Native C address and undefined-behavior sanitizers
+        if: runner.os == 'Linux'
+        env:
+          CC: clang
+        run: npm run test:cli -- --sanitize

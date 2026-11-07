@@ -33,8 +33,13 @@ revision if known; deployments may differ from the latest repository code.
   Rekeying confirms continuity; it does not authenticate that initial peer.
 - Verify peer depends on an independent comparison of every fingerprint group
   on trusted screens and confirmation on both devices.
-- Clear text and the diagnostic file CLI provide no confidentiality or peer
+- Clear text and WAV diagnostics provide no confidentiality or peer
   authentication. Playback completion is not a delivery receipt.
+- The native C client's encrypted modes share the browser trust model. It uses
+  installed OpenSSL 3, PortAudio and the external JotTune Synth SDK. Passwords
+  remain masked unless explicitly revealed/exported; protect output files and
+  terminal history. Received text cannot invoke local CLI commands or terminal
+  control sequences. Physical CLI/device acceptance remains pending.
 - The host-delivered code, browsers, operating systems, endpoint screens and
   clipboard behavior remain trusted. A hidden URL is not access control.
 - Signed-enrollment showcase objects do not authenticate the audio handshake
