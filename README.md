@@ -134,6 +134,12 @@ checks, session-throughput measurements and the report generator. Open
 prepared renderer; physical speaker/microphone and phone-call acceptance remain
 separate. See [testing](docs/TESTING.md) and [browser automation](docs/AUTOMATION.md).
 
+## Author
+
+Created by [Nenad Micic](https://be.linkedin.com/in/nenadmicic).
+Contact: [nenad@micic.be](mailto:nenad@micic.be).
+Source: [nmicic/toneseal](https://github.com/nmicic/toneseal).
+
 ## Development
 
 ToneSeal is developed with **AI assistance**. Maintainers are responsible for
