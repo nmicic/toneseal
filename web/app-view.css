@@ -55,6 +55,9 @@ body[data-experience=app] .progress-heading { gap: 6px; flex-wrap: nowrap; min-h
 body[data-experience=app] .progress-heading h2 { flex: 1; }
 body[data-experience=app] #app-status-details { position: absolute; right: -4px; top: -2px; min-height: 44px; margin: 0; padding: 4px 6px; font-size: 11px; white-space: nowrap; }
 body[data-experience=app] #auto-status { font-size: 13px; line-height: 1.4; margin: 0; padding-right: 48px; }
+/* Poll status alternates between one and two lines. Reserve both while chatting
+   so each turn does not shrink the conversation and displace its latest row. */
+body[data-experience=app][data-app-chat=true][data-app-active=true][data-app-connecting=false] #auto-status { min-height: 2.8em; }
 body[data-experience=app] #app-operating-note { font-size: 11px; line-height: 1.35; margin: 3px 0 0; }
 body[data-experience=app] #session-expiry { font-size: 11px; line-height: 1.35; margin: 3px 0 0; }
 body[data-experience=app] #verification-panel { padding-top: 5px; margin-top: 5px; }

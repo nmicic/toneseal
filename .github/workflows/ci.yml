@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core:
+    name: Core and native receiver (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+      - name: Install pinned development dependencies
+        run: npm ci --ignore-scripts
+      - name: Core, packaging and independent C framing checks
+        run: npm test
+      - name: Shared-timeline session and chat simulations
+        run: |
+          npm run test:simulation
+          npm run test:throughput
+          node tests/chat-simulation.mjs
+          node tests/chat-close-simulation.mjs
+      - name: Native C address and undefined-behavior sanitizers
+        if: runner.os == 'Linux'
+        env:
+          CC: clang -fsanitize=address,undefined -fno-omit-frame-pointer
+        run: node --test tests/codec-vectors.mjs

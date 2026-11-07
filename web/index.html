@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="robots" content="noindex,nofollow,noarchive"><meta name="referrer" content="no-referrer">
-  <meta name="color-scheme" content="light"><title>ToneSeal · Short messages, carried by sound</title>
+  <meta name="referrer" content="no-referrer">
+  <meta name="color-scheme" content="light"><title>ToneSeal · Experimental beta</title>
   <link rel="help" type="application/json" href="automation-guide.json" title="ToneSeal browser agent interface">
   <link rel="stylesheet" href="auto-app.css"><link rel="stylesheet" href="site-nav.css"><link rel="stylesheet" href="section-nav.css"><link rel="stylesheet" href="audio-visuals.css"><link rel="stylesheet" href="app-view.css"><script type="module" src="site-nav.mjs"></script><script type="module" src="auto-app.mjs"></script>
 </head>
@@ -17,7 +17,7 @@
     <button id="mode-clear" data-mode="clear" role="tab" aria-controls="transfer-panel" aria-selected="false" tabindex="-1">Clear text</button>
     <button id="mode-advanced" type="button" role="tab" aria-controls="advanced-options" aria-selected="false" tabindex="-1">Advanced</button>
   </div>
-    <p class="site-location site-context" aria-label="Current location"><strong id="site-location" data-protection="encrypted">Encrypted message</strong><button id="section-toggle" type="button" aria-controls="section-nav" aria-expanded="false" hidden>Sections ▾</button></p>
+    <p class="site-location site-context" aria-label="Current location"><strong id="site-location" data-protection="encrypted">Encrypted message</strong><button id="section-toggle" type="button" aria-controls="section-nav" aria-expanded="false" hidden>Sections ▾</button><span id="release-status" class="release-status">Experimental beta</span></p>
   </div>
 </header>
 <nav id="section-nav" aria-label="Page sections" hidden>
@@ -173,7 +173,7 @@
       <p>Error correction handles recoverable signal damage. Encryption, peer verification and delivery receipts operate separately above this audio layer.</p>
     </details>
   </section>
-  <p class="footnote">Local audio processing · No message server · No saved history</p>
+  <p class="footnote">Experimental beta · Local audio processing · No message server · No saved history. <a href="mailto:nenad@micic.be?subject=ToneSeal%20security%20report">Report a security issue</a>.</p>
 </main>
 <footer>LISTENING IS ALWAYS VISIBLE. STOP IS ALWAYS YOURS.</footer>
 <aside id="audio-visuals" aria-label="Live audio views"></aside>

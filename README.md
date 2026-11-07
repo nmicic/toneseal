@@ -1,7 +1,7 @@
 # ToneSeal
 
-Experimental short messages and secrets, carried by sound. ToneSeal provides a
-browser app with encrypted Message and Password modes, an explicit Clear text
+**Experimental beta.** Short messages and secrets, carried by sound. ToneSeal
+provides a browser app with encrypted Message and Password modes, an explicit Clear text
 mode, and a signed-enrollment showcase. Message can stay connected for replies.
 
 Sound is rendered by [JotTune Synth](https://github.com/chimepond/jottune-synth).
@@ -13,6 +13,9 @@ This is an experimental project, not an independently audited secret-transfer
 system. Use dummy secrets while testing. Simple mode encrypts the connection
 but leaves the initial peer unverified; compare the complete fingerprint on
 both trusted screens with Verify peer before exchanging a real secret.
+
+Report vulnerabilities privately using [SECURITY.md](SECURITY.md).
+See the [changelog](CHANGELOG.md) and [release guide](docs/RELEASING.md).
 
 ## Run locally
 
@@ -107,11 +110,17 @@ Linux/macOS clients and native mobile apps are future work.
 ## Checks
 
 Native receiver builds target macOS and Linux. The core tests need no synth
-checkout, browser installation, hosting account or network service. They include independent framing fixtures and a C receiver build:
+checkout, browser installation, hosting account or network service. They include
+independent framing fixtures and a C receiver build:
 
 ```sh
 npm test
 ```
+
+GitHub Actions runs these checks and session/chat simulations on Linux and
+macOS, including a Linux C sanitizer check. Full browser/acoustic checks remain
+separate. The maintainer reports successful browser transfers on Android,
+Windows, iOS and macOS.
 
 For browser checks, install the pinned development dependency and its browsers:
 

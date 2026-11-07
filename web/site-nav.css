@@ -84,6 +84,7 @@ button.primary:hover:not(:disabled) { background: #223637; border-color: #223637
 .site-location { display: flex; align-items: center; gap: 7px; min-height: 29px; margin: 0; color: #536164; font-size: 11px; line-height: 1.4; }
 .site-location a { color: inherit; text-decoration: none; }
 .site-location strong { color: var(--site-ink); font-weight: 600; }
+.release-status { margin-left: auto; flex: 0 0 auto; padding: 1px 6px; border: 1px solid var(--site-line); border-radius: 4px; color: #536164; font-size: 10px; line-height: 1.4; font-weight: 600; white-space: nowrap; }
 /* Encryption is named in text as well as colour; it is not an identity claim. */
 #site-location[data-protection] { padding: 2px 7px; border-radius: 4px; }
 #site-location[data-protection=encrypted] { color: #285e4c; background: #e7f1eb; }
