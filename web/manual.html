@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="referrer" content="no-referrer">
+  <meta name="color-scheme" content="light">
+  <title>ToneSeal · Manual pairing lab</title>
+  <link rel="stylesheet" href="app.css">
+  <script type="module" src="app.mjs"></script>
+  <link rel="stylesheet" href="site-nav.css"><script type="module" src="site-nav.mjs"></script>
+</head>
+<body>
+  <header id="site-header">
+  <div class="site-header-inner">
+    <div class="site-brand-row"><a href="./" class="brand" aria-label="ToneSeal home"><span aria-hidden="true">≋</span> ToneSeal</a><a href="./?advanced=1" class="quiet-link">← Back to Advanced</a></div>
+    <nav id="site-nav" aria-label="ToneSeal">
+      <a href="./?mode=message">Message</a>
+      <a href="./?mode=password">Password</a>
+      <a href="./?mode=clear">Clear text</a>
+      <a href="./?advanced=1" aria-current="page">Advanced</a>
+    </nav>
+    <p class="site-location site-context" aria-label="Current location"><span>Advanced</span><span aria-hidden="true">/</span><strong id="site-location">Manual lab</strong></p>
+  </div>
+</header>
+  <main>
+    <section class="intro">
+      <div class="eyebrow">ADVANCED · MANUAL PAIRING LAB</div>
+      <h1>Send it through<br>the air.</h1>
+      <p class="lede">A message. A password. A few seconds of sound.<br>Pair two nearby devices, then let them talk.</p>
+      <div class="signal" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    </section>
+    <div class="mode-bar" role="group" aria-label="Transfer mode">
+      <button class="mode active" data-mode="message" aria-pressed="true"><span>01</span> Encrypted message</button>
+      <button class="mode" data-mode="password" aria-pressed="false"><span>02</span> Password transfer</button>
+      <button class="mode" data-mode="clear" aria-pressed="false"><span>03</span> Cleartext lab</button>
+    </div>
+    <p id="mode-note" class="mode-note">Encrypted device to device. Verify your peer before sending.</p>
+    <section class="next-step" aria-labelledby="next-title">
+      <div><span id="device-role" class="eyebrow">CHOOSE YOUR DEVICE</span><h2 id="next-title">Start with two devices</h2><p id="next-instruction">Use Start pairing on Device 1 and Answer pairing on Device 2.</p><output id="next-fingerprint" class="fingerprint" aria-label="Verification fingerprint" hidden></output></div>
+      <div id="role-choices" class="button-row"><button id="choose-device1" class="primary">Device 1 · Start pairing</button><button id="choose-device2">Device 2 · Answer pairing</button></div>
+      <button id="next-action" class="primary" hidden>Next action</button>
+    </section>
+    <section class="transport" aria-labelledby="transport-title">
+      <div><div class="eyebrow" id="transport-title">AUDIO LINK</div><p id="status" role="status" aria-live="polite">Ready when you are. Start pairing, or try a cleartext message.</p><p id="delivery-status" class="fine" role="status">No encrypted message awaiting acknowledgment.</p><p id="packet-info" class="fine">Nothing is listening or playing.</p></div>
+      <div class="transport-controls"><button id="play" class="primary" disabled>▶ Play packet</button><button id="retry" disabled>Restore last packet</button><button id="retry-pending" disabled>Resend unacknowledged</button><button id="listen">● Listen</button><button id="finish" hidden>Stop &amp; decode</button><button id="cancel" class="text-button">Stop</button></div>
+      <p class="volume">App playback: 100%. Adjust your device’s speaker volume as needed.</p>
+    </section>
+    <details id="flow-guide" class="flow-guide" open>
+      <summary>Device 1 / Device 2 · first-transfer timeline</summary>
+      <p class="flow-intro">Device 1 starts pairing and sends the first message. Device 2 answers. <strong>Prepare and Confirm make audio; only Play packet sends it.</strong> Start the listener before every playback.</p>
+      <ol id="encrypted-timeline" class="timeline">
+        <li><strong>1 · Send the pairing offer</strong><p><b>Device 1:</b> choose Encrypted message, then Start pairing. <b>Device 2:</b> choose Encrypted message, then Answer pairing → Listen. <b>Device 1:</b> Play packet. <b>Device 2:</b> after the sound ends, Stop &amp; decode.</p><small>Device 2 should now show “Pairing answer” prepared.</small></li>
+        <li><strong>2 · Send the pairing answer back</strong><p><b>Device 1:</b> Listen. <b>Device 2:</b> Play packet. <b>Device 1:</b> after the sound ends, Stop &amp; decode.</p><small>Both devices should now display the same eight fingerprint groups.</small></li>
+        <li><strong>3 · Compare, then send Device 1’s confirmation</strong><p><b>Both:</b> compare every fingerprint group. If all match, tap “All groups match · confirm peer” on each device. <b>Device 2:</b> Listen. <b>Device 1:</b> Play packet. <b>Device 2:</b> after the sound ends, Stop &amp; decode.</p><small>Confirmation is not sent by tapping Confirm alone. Device 2 still needs to send its own confirmation.</small></li>
+        <li><strong>4 · Send Device 2’s confirmation back</strong><p><b>Device 1:</b> Listen. <b>Device 2:</b> Play packet. <b>Device 1:</b> after the sound ends, Stop &amp; decode.</p><small>Both devices should now show “READY TO SEND”.</small></li>
+        <li><strong>5 · Send your first message</strong><p><b>Device 1:</b> type “Hello” in Write your message, then Prepare encrypted message. <b>Device 2:</b> Listen. <b>Device 1:</b> Play packet. <b>Device 2:</b> after the sound ends, Stop &amp; decode.</p><small>“Hello” should appear under Received on Device 2. An empty input keeps Prepare disabled even after pairing.</small></li>
+        <li><strong>6 · Return the delivery receipt</strong><p><b>Device 1:</b> Listen. <b>Device 2:</b> Play packet to send its prepared receipt. <b>Device 1:</b> after the sound ends, Stop &amp; decode.</p><small>Device 1 should show “Delivery confirmed”. For a password, switch to Password transfer and repeat steps 5–6; then tap Copy on Device 2. No new pairing is needed.</small></li>
+      </ol>
+      <ol id="clear-timeline" class="timeline" hidden>
+        <li><strong>1 · Prepare on Device 1</strong><p><b>Both:</b> choose Cleartext lab. <b>Device 1:</b> type “Hello”, then Prepare cleartext message. No pairing is needed.</p></li>
+        <li><strong>2 · Listen first, then play</strong><p><b>Device 2:</b> Listen and allow microphone access. <b>Device 1:</b> Play packet.</p></li>
+        <li><strong>3 · Decode on Device 2</strong><p><b>Device 2:</b> wait until the sound ends, then Stop &amp; decode. Look for “Hello” under Received. Cleartext has no delivery receipt.</p></li>
+      </ol>
+      <p class="flow-recovery">If you see “No packet recovered”, stay on the same step: the receiver taps Listen again, the sender replays the same packet, then the receiver taps Stop &amp; decode. Keep both pages visible. For a fresh start, tap Disconnect on both devices.</p>
+    </details>
+    <div class="workspace">
+      <section class="panel connection" aria-labelledby="pair-title">
+        <div class="panel-heading"><span class="step">1</span><h2 id="pair-title">Connect the devices</h2><span id="connection-badge" class="badge">NOT PAIRED</span></div>
+        <p id="pair-help">Open this page on both devices. Choose Start pairing on one and Answer pairing on the other.</p>
+        <div class="button-row"><button id="start-pair" class="primary">Start pairing · Device 1</button><button id="answer-pair">Answer pairing · Device 2</button></div>
+        <div id="fingerprint-panel" hidden>
+          <div class="eyebrow">COMPARE BOTH SCREENS</div>
+          <p>Every group must match on both devices. Compare in person or through a separate trusted channel.</p>
+          <output id="fingerprint" class="fingerprint"></output>
+          <button id="confirm-peer" class="primary full">All groups match · confirm peer</button>
+          <p class="fine">Confirm prepares audio. You must still Play packet and receive the other device’s confirmation (timeline steps 3–4).</p>
+        </div>
+        <div class="button-row secondary-actions"><button id="restore-confirmation" hidden>Restore my confirmation</button><button id="rekey" disabled>Refresh session keys</button><button id="disconnect" disabled>Disconnect</button></div>
+        <div class="pair-guide"><span class="eyebrow">HOW THE EXCHANGE WORKS</span><ol><li>Receiver taps Listen.</li><li>Sender taps Play packet.</li><li>Receiver taps Stop &amp; decode after the sound.</li><li>Follow the status, then swap roles.</li></ol></div>
+      </section>
+      <section class="panel compose" aria-labelledby="compose-title">
+        <div class="panel-heading"><span class="step">2</span><h2 id="compose-title">Write your message</h2></div>
+        <label for="message" id="compose-label">MESSAGE TO SEND</label>
+        <textarea aria-describedby="compose-hint byte-count" id="message" rows="4" placeholder="You can type here now. Try Hello." autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+        <input aria-describedby="compose-hint byte-count" id="password" type="password" placeholder="Paste a password here" autocomplete="off" autocapitalize="off" spellcheck="false" hidden>
+        <div class="field-meta"><span id="byte-count">0 / 96 bytes</span><button id="paste" class="text-button" hidden>Paste from clipboard</button></div>
+        <button id="prepare-message" class="primary full" disabled>Prepare encrypted message</button>
+        <p id="compose-hint" class="send-reason" role="status">Pair and confirm both devices to unlock sending.</p>
+        <div class="received-head"><h3>Received</h3><span id="received-kind" class="fine">THIS SESSION ONLY</span></div>
+        <div id="empty-received" class="empty">Your next message lands here.</div>
+        <pre id="received-text" hidden></pre>
+        <label for="received-secret" id="received-secret-label" hidden>Received password</label>
+        <input id="received-secret" type="password" readonly autocomplete="off" hidden>
+        <div class="button-row"><button id="copy-received" disabled>Copy</button><button id="clear-received" disabled>Clear</button></div>
+        <p id="secret-note" class="fine" hidden>Cleared from this page after 60 seconds or when hidden. Your system clipboard may keep or sync a copy.</p>
+      </section>
+    </div>
+    <details class="details"><summary>Before you send a real secret</summary><div><p>This is an experimental protocol, not an audited password manager. Test with dummy messages first. Nearby devices can hear, record or interfere with the sound. Encryption protects message content after you verify the peer; it cannot protect a compromised device or clipboard.</p><p>There is no message server, analytics, or stored message history. The page downloads its application files over HTTPS. Use a trusted local copy served on localhost for an offline computer. A hidden, rotating URL is a convenience, not access control.</p><p>Keep both pages visible and unlocked. Use short messages, a quiet room, and a comfortable volume. An encrypted receipt confirms delivery: play the prepared receipt back to the sender. If a message or receipt is lost, choose Resend unacknowledged. The receiver acknowledges repeats without delivering them twice. Microphone capture stops after 20 seconds.</p><p><a href="communication.html">Open the original cleartext experiment →</a></p></div></details>
+  </main>
+  <footer><span>LOCAL SOUND. DELIBERATE TRUST.</span><span>One peer · One packet at a time</span></footer>
+</body>
+</html>

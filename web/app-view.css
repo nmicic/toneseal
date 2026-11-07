@@ -1,0 +1,187 @@
+/* Copyright (c) 2026 Nenad Micic */
+/* SPDX-License-Identifier: Apache-2.0 */
+
+/* Both presentations operate the same controls. Web retains its document flow. */
+#experience-toggle { flex: 0 0 auto; min-height: 44px; padding: 8px 12px; font-size: 12px; white-space: nowrap; }
+.site-brand-row { flex-wrap: wrap; }
+.site-brand-row .header-actions:has(button:not([hidden])) { margin-left: auto; }
+.site-brand-row .header-actions:not(:has(button:not([hidden]))) { display: none; }
+#app-options { min-height: 44px; padding: 6px 8px; font-size: 12px; white-space: nowrap; }
+body:not([data-experience=app]) :is(.app-only, .chat-direction),
+body:not([data-experience=app]) #transfer-options > summary,
+body:not([data-experience=app]) #status-details > summary { display: none; }
+body:not([data-experience=app]) :is(#transfer-options, #status-details) { margin: 0; }
+#composer-controls > .start-row { margin-top: 8px; justify-content: flex-end; gap: 8px; }
+#composer-controls > .start-row .primary { margin-left: auto; }
+
+html:has(body[data-experience=app]) { height: 100%; overflow: hidden; scroll-padding: 0; }
+body[data-experience=app] {
+  display: flex; flex-direction: column; height: var(--app-viewport-height, 100dvh);
+  min-height: 0; overflow: hidden; padding: 0;
+}
+body[data-experience=app] #site-header { position: relative; flex: 0 0 auto; }
+body[data-experience=app] .site-header-inner { max-width: 800px; }
+body[data-experience=app] :is(.site-caption, .header-actions) { display: none; }
+body[data-experience=app] .site-brand-row { min-height: 44px; gap: 4px 12px; }
+body[data-experience=app] #experience-toggle { margin-left: auto; }
+body[data-experience=app] .site-context { min-height: 24px; }
+body[data-experience=app] #site-nav > button { min-height: 44px; padding-top: 8px; padding-bottom: 8px; }
+body[data-experience=app] :is(#section-nav, #section-toggle) { display: none !important; }
+body[data-experience=app] > main {
+  display: flex; flex: 1 1 auto; min-height: 0; width: 100%; max-width: 800px;
+  margin: 0 auto; padding: 8px 26px; overflow: auto; overscroll-behavior: contain;
+}
+body[data-experience=app] main > :is(.eyebrow, #page-title, #flow-intro, #about-toneseal, .footnote),
+body[data-experience=app] > footer,
+body[data-experience=app] #transfer-panel > details { display: none; }
+body[data-experience=app] #transfer-panel { display: flex; flex: 1; min-width: 0; min-height: 0; }
+#app-view-shell { display: flex; flex: 1 1 auto; flex-direction: column; gap: 6px; min-width: 0; min-height: 0; }
+.app-view-slot { min-width: 0; }
+/* Required status and consent never live in a clipped or scrolling panel. */
+body[data-experience=app] #app-view-status { flex: 0 0 auto; overflow: visible; }
+body[data-experience=app] #app-view-content {
+  display: flex; flex-direction: column; flex: 1 1 0; min-height: 72px;
+  overflow: hidden; border: 1px solid var(--line); border-radius: 8px;
+  background: #fafbf7;
+}
+body[data-experience=app] #app-view-composer { flex: 0 0 auto; }
+body[data-experience=app] #app-view-shell section { margin: 0; padding: 8px 10px; border: 0; border-radius: 0; }
+body[data-experience=app] #app-view-shell .card-title { gap: 6px; margin: 0; min-height: 44px; flex-wrap: nowrap; }
+body[data-experience=app] #app-view-shell h2 { font-size: 14px; letter-spacing: 0; }
+body[data-experience=app] #app-view-shell #progress-panel { padding: 4px 10px 7px; border-radius: 8px; background: #fffef9; box-shadow: inset 0 0 0 1px var(--line); }
+body[data-experience=app] #status-essential { position: relative; }
+body[data-experience=app] :is(.app-box-label, #elapsed) { display: none; }
+body[data-experience=app] .progress-heading { gap: 6px; flex-wrap: nowrap; min-height: 26px; padding-right: 52px; }
+body[data-experience=app] .progress-heading h2 { flex: 1; }
+body[data-experience=app] #app-status-details { position: absolute; right: -4px; top: -2px; min-height: 44px; margin: 0; padding: 4px 6px; font-size: 11px; white-space: nowrap; }
+body[data-experience=app] #auto-status { font-size: 13px; line-height: 1.4; margin: 0; padding-right: 48px; }
+body[data-experience=app] #app-operating-note { font-size: 11px; line-height: 1.35; margin: 3px 0 0; }
+body[data-experience=app] #session-expiry { font-size: 11px; line-height: 1.35; margin: 3px 0 0; }
+body[data-experience=app] #verification-panel { padding-top: 5px; margin-top: 5px; }
+body[data-experience=app] #verification-panel > p { font-size: 11px; line-height: 1.35; margin: 0 0 4px; }
+body[data-experience=app] #auto-fingerprint { font-size: 13px; line-height: 1.55; letter-spacing: .3px; padding: 5px 7px; margin: 4px 0; overflow-wrap: anywhere; }
+body[data-experience=app] #auto-confirm { min-height: 44px; padding: 8px 10px; font-size: 13px; }
+/* Details open deliberately inside a bounded share of the conversation area. */
+body[data-experience=app] :is(#transfer-options, #status-details) { flex: 0 1 auto; min-height: 0; max-height: 65%; overflow: auto; margin: 0; padding: 0 10px; scrollbar-width: thin; }
+body[data-experience=app] :is(#transfer-options, #status-details)[open] { padding: 8px 10px; border-bottom: 1px solid var(--line); }
+body[data-experience=app] :is(#transfer-options, #status-details) > summary { display: none; }
+body[data-experience=app] #transfer-options .verification-options { padding: 0; margin: 0; border: 0; }
+body[data-experience=app] #transfer-options :is(.profile-control, .playback-control) { margin-top: 8px; padding-top: 8px; }
+body[data-experience=app] :is(#transfer-options, #status-details) :is(.hint, .trust-note) { font-size: 11px; line-height: 1.4; margin: 5px 0; }
+body[data-experience=app] #link-diagnostics { margin: 0; }
+body[data-experience=app] #link-diagnostics > summary { font-size: 12px; padding: 10px 0; }
+body[data-experience=app] #transfer-options .input-meta { margin-top: 6px; justify-content: flex-start; gap: 10px; }
+body[data-experience=app] .toggle { min-height: 44px; }
+
+/* The header stays put; only actual messages scroll. Copy sits alongside text. */
+body[data-experience=app] #app-view-shell #chat-panel { display: flex; flex: 1 1 0; flex-direction: column; min-height: 0; padding: 0 8px 4px; }
+body[data-experience=app] #chat-panel > .card-title { flex: 0 0 auto; }
+body[data-experience=app] #chat-title { flex: 1; }
+body[data-experience=app] #chat-panel .badge { font-size: 8px; padding: 4px; }
+body[data-experience=app] #chat-panel :is(#chat-clear, #chat-latest) { min-width: 44px; min-height: 44px; padding: 4px; font-size: 11px; margin: 0; }
+body[data-experience=app] :is(#chat-reply, .chat-retention-note, .chat-meta-full) { display: none; }
+body[data-experience=app] #chat-empty { font-size: 12px; line-height: 1.4; margin: 2px 0 8px; }
+body[data-experience=app] #chat-history { flex: 1 1 0; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; overflow-anchor: none; margin: 0; padding: 0; gap: 0; }
+body[data-experience=app] .chat-entry { display: grid; grid-template-columns: 44px minmax(0, 1fr); align-items: center; gap: 5px; flex: 0 0 auto; width: 100%; max-width: none; min-height: 44px; padding: 2px 3px; margin: 0; border: 0; border-bottom: 1px solid #e2e7de; border-radius: 0; background: transparent; }
+body[data-experience=app] .chat-entry.outgoing { background: #f0f3eb; }
+body[data-experience=app] .chat-body { grid-column: 2; grid-row: 1; min-width: 0; line-height: 1.4; overflow-wrap: anywhere; }
+body[data-experience=app] .chat-entry :is(.chat-meta, .chat-receipt) { display: inline; font-size: 10px; line-height: inherit; }
+body[data-experience=app] .chat-entry .chat-meta::after,
+body[data-experience=app] .chat-entry .chat-receipt::before { content: ' · '; }
+body[data-experience=app] .chat-entry p { display: inline; font-size: 14px; line-height: inherit; margin: 0; white-space: pre-wrap; }
+body[data-experience=app] .chat-entry .chat-copy { grid-column: 1; grid-row: 1; min-width: 44px; min-height: 44px; padding: 3px 0; margin: 0; font-size: 10px; line-height: 1.2; text-align: center; overflow-wrap: anywhere; }
+body[data-experience=app] #received-panel { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-content: start; gap: 0 6px; flex: 1 1 auto; min-height: 0; overflow: auto; }
+body[data-experience=app] #received-panel .card-title { grid-column: 1 / -1; grid-row: 1; min-height: 26px; margin-bottom: 4px; }
+body[data-experience=app] #received-empty { grid-column: 1 / -1; font-size: 12px; line-height: 1.4; margin: 4px 0; }
+body[data-experience=app] #secret-label { grid-column: 1 / -1; grid-row: 2; margin: 3px 0; font-size: 11px; }
+body[data-experience=app] #received-panel pre { grid-column: 1; grid-row: 3; padding: 7px; margin: 0; font-size: 13px; }
+body[data-experience=app] #auto-received-secret { grid-column: 1; grid-row: 3; min-width: 0; padding: 6px; min-height: 44px; }
+body[data-experience=app] .received-actions { grid-column: 2; grid-row: 3; align-self: start; gap: 4px; margin: 0; }
+body[data-experience=app] #received-panel:has(#received-empty:not([hidden])) .received-actions { display: none; }
+body[data-experience=app] .received-actions button { padding: 6px 10px; }
+body[data-experience=app] #secret-note { grid-column: 1 / -1; grid-row: 4; font-size: 11px; line-height: 1.35; margin: 4px 0 0; }
+
+/* Password shares the other modes' bottom composer position. Open connection
+   details fill spare space; settings retain their natural height. When needed,
+   this content area scrolls as one surface above the fixed composer. */
+body[data-experience=app][data-experience-mode=password] #app-view-content {
+  flex: 1 1 0; min-height: 0; gap: 6px; overflow: auto; scrollbar-width: thin;
+  border: 0; border-radius: 0; background: transparent;
+}
+body[data-experience=app][data-experience-mode=password] #app-view-composer { margin-top: 0; }
+body[data-experience=app][data-experience-mode=password] #app-view-content #received-panel {
+  flex: 0 0 auto; overflow: visible; padding: 8px 10px;
+  border: 1px solid var(--line); border-radius: 8px; background: #fffef9;
+}
+body[data-experience=app][data-experience-mode=password] :is(#transfer-options, #status-details):not([open]) { display: none; }
+body[data-experience=app][data-experience-mode=password] :is(#transfer-options, #status-details)[open] {
+  flex: 0 0 auto; max-height: none; overflow: visible;
+  border: 1px solid var(--line); border-radius: 8px; background: #fffef9;
+}
+body[data-experience=app][data-experience-mode=password] #status-details[open] { flex-grow: 1; }
+body[data-experience=app] :is(#app-options, #app-status-details)[aria-expanded=true] {
+  color: #285e4c; background: #e2eadc; border-radius: 6px;
+  box-shadow: inset 0 0 0 1px #c4d2c2;
+}
+
+/* Editor, then one operational row. Secondary metadata remains in Options. */
+body[data-experience=app] #app-view-composer #compose-panel { padding: 0; border: 0; border-radius: 0; background: transparent; }
+body[data-experience=app] #compose-panel > .card-title,
+body[data-experience=app] #auto-label { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+body[data-experience=app] #composer-controls { display: flex; flex-direction: column; gap: 0; }
+body[data-experience=app] #auto-text { min-height: 44px; height: 48px; max-height: 90px; padding: 6px 8px; resize: none; }
+body[data-experience=app] #auto-password { padding: 6px 8px; min-height: 44px; }
+body[data-experience=app] #composer-controls > .start-row { display: flex; flex-wrap: nowrap; align-items: center; gap: 4px; margin: 4px 0 0; }
+body[data-experience=app] .start-row > button { flex: 0 0 auto; min-width: 44px; min-height: 44px; margin: 0; padding: 6px 8px; font-size: 12px; line-height: 1.3; white-space: nowrap; }
+body[data-experience=app] .start-row > #auto-start {
+  flex: 0 1 auto; min-width: 132px; max-width: 100%; margin-left: auto;
+  padding: 6px 14px; font-size: 14px; letter-spacing: normal;
+}
+body[data-experience=app][data-app-active=true] .start-row > #auto-start { min-width: 64px; }
+body[data-experience=app] #auto-paste { min-width: 44px; }
+body[data-experience=app] :is(#start-hint, #input-hint, #example-hint, #transfer-next, #chat-jump) { display: none !important; }
+body[data-experience=app] #composer-validation { margin: 4px 0 0; font-size: 11px; line-height: 1.35; color: #8c3b20; }
+body[data-experience=app] #composer-validation:empty { display: none; }
+body[data-experience=app] #chat-queue { font-size: 10px; line-height: 1.3; margin: 3px 0 0; }
+body[data-experience=app][data-app-connecting=true] :is(#auto-text, #auto-password, #auto-start, #auto-paste) { display: none !important; }
+body[data-experience=app][data-app-connecting=true] #composer-controls > .start-row { margin: 0; }
+
+/* The live plot remains visible but no longer takes three separate rows. */
+body[data-experience=app] #audio-visuals { position: static; flex: 0 0 auto; width: 100%; margin-top: 0; box-shadow: none; }
+body[data-experience=app] .audio-visual-inner { padding-bottom: 3px; }
+body[data-experience=app] .audio-visual-readings { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+body[data-experience=app] .audio-visual-plot { height: 28px; border-radius: 4px; }
+/* Tone history keeps its larger visual presence; compact screens use its
+   original smaller height so messages and verification still have room. */
+body[data-experience=app] #audio-visuals[data-view=tones] .audio-visual-plot { height: 54px; border-radius: 6px; }
+body[data-experience=app][data-app-compact=true] #audio-visuals[data-view=tones] .audio-visual-plot { height: 36px; }
+body[data-experience=app] .audio-visual-peaks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 1px 8px; }
+body[data-experience=app] .audio-visual-peak { display: grid; grid-template-columns: 1fr auto; gap: 0 4px; min-height: 0; }
+body[data-experience=app] .audio-visual-peak label { font-size: 8px; }
+body[data-experience=app] .audio-visual-peak meter { grid-column: 1 / -1; grid-row: 2; height: 8px; }
+body[data-experience=app] .audio-visual-peak output { font-size: 8px; }
+
+@media (max-width: 700px) {
+  .site-brand-row .site-caption { display: none; }
+  body:not([data-experience=app]) .site-brand-row .header-actions:has(#header-stop:not([hidden])):has(#header-abort:not([hidden])) { flex-basis: 100%; justify-content: flex-end; margin: 0 0 4px; }
+  body[data-experience=app] > main { padding: 6px max(10px, env(safe-area-inset-right)) 6px max(10px, env(safe-area-inset-left)); }
+  body[data-experience=app] .site-header-inner { padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
+  body[data-experience=app] #app-view-shell { gap: 5px; }
+  body[data-experience=app] #auto-fingerprint { font-size: 12px; }
+  body[data-experience=app] .start-row > button { padding: 6px; font-size: 12px; }
+}
+/* Extremely short landscape/keyboard viewports use one outer scroll region.
+   There is no independently clipped Status and no forced consent scrolling. */
+@media (max-height: 430px) {
+  body[data-experience=app] > main { display: block; }
+  body[data-experience=app] #app-view-shell { min-height: 260px; }
+  body[data-experience=app] #app-view-content { flex: 1 0 72px; }
+  body[data-experience=app][data-experience-mode=password] #app-view-content,
+  body[data-experience=app][data-experience-mode=password] :is(#transfer-options, #status-details)[open] { flex: 0 0 auto; overflow: visible; }
+}
+body[data-experience=app][data-app-keyboard=true] > main { display: block; }
+body[data-experience=app][data-app-keyboard=true] #app-view-shell { min-height: 260px; }
+body[data-experience=app][data-app-keyboard=true] #app-view-content { flex: 1 0 72px; }
+body[data-experience=app][data-experience-mode=password][data-app-keyboard=true] #app-view-content,
+body[data-experience=app][data-experience-mode=password][data-app-keyboard=true] :is(#transfer-options, #status-details)[open] { flex: 0 0 auto; overflow: visible; }
+@media (prefers-reduced-motion: reduce) { .app-view-slot { scroll-behavior: auto; } }

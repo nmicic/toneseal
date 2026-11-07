@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow,noarchive"><meta name="referrer" content="no-referrer">
+  <meta name="color-scheme" content="light"><title>ToneSeal · Short messages, carried by sound</title>
+  <link rel="help" type="application/json" href="automation-guide.json" title="ToneSeal browser agent interface">
+  <link rel="stylesheet" href="auto-app.css"><link rel="stylesheet" href="site-nav.css"><link rel="stylesheet" href="section-nav.css"><link rel="stylesheet" href="audio-visuals.css"><link rel="stylesheet" href="app-view.css"><script type="module" src="site-nav.mjs"></script><script type="module" src="auto-app.mjs"></script>
+</head>
+<body>
+<header id="site-header">
+  <div class="site-header-inner">
+    <div class="site-brand-row"><a href="./" class="brand" aria-label="ToneSeal home"><span aria-hidden="true">≋</span> ToneSeal</a><span id="site-caption" class="site-caption">SHORT MESSAGES THROUGH SOUND</span><span class="header-actions"><button id="header-stop" type="button" hidden>End chat</button><button id="header-abort" type="button" hidden>Stop now</button></span><button id="experience-toggle" type="button" aria-label="Switch to Web view">Web view</button></div>
+    <div id="site-nav" class="mode-tabs" role="tablist" aria-label="ToneSeal">
+    <button id="mode-message" data-mode="message" role="tab" aria-controls="transfer-panel" class="active" aria-selected="true">Message</button>
+    <button id="mode-password" data-mode="password" role="tab" aria-controls="transfer-panel" aria-selected="false" tabindex="-1">Password</button>
+    <button id="mode-clear" data-mode="clear" role="tab" aria-controls="transfer-panel" aria-selected="false" tabindex="-1">Clear text</button>
+    <button id="mode-advanced" type="button" role="tab" aria-controls="advanced-options" aria-selected="false" tabindex="-1">Advanced</button>
+  </div>
+    <p class="site-location site-context" aria-label="Current location"><strong id="site-location" data-protection="encrypted">Encrypted message</strong><button id="section-toggle" type="button" aria-controls="section-nav" aria-expanded="false" hidden>Sections ▾</button></p>
+  </div>
+</header>
+<nav id="section-nav" aria-label="Page sections" hidden>
+  <div class="section-nav-heading"><span>On this page</span><button id="section-close" type="button" aria-label="Close page sections" hidden>Close</button></div>
+  <div id="section-links"></div>
+</nav>
+<main>
+  <div class="eyebrow">SHORT MESSAGES. CARRIED BY SOUND.</div>
+  <h1 id="page-title">Write. Connect. Talk.</h1>
+  <p id="flow-intro" class="lede"><strong>One sender. One receiver.</strong><br>Write the first message on one device. Leave the other blank, then start both. Message stays connected for replies.</p>
+  <div id="transfer-panel" role="tabpanel" aria-labelledby="mode-message">
+  <section id="compose-panel" class="transfer-card" aria-labelledby="compose-title">
+    <div class="card-title"><h2 id="compose-title">What would you like to send?</h2><span id="auto-role" class="badge">RECEIVING DEVICE</span><button id="app-options" type="button" class="app-only text-button" aria-controls="transfer-options" aria-expanded="false">Options</button></div>
+    <div id="composer-controls">
+    <label id="auto-label" for="auto-text">Your message <span>leave blank on the receiving device</span></label>
+    <textarea id="auto-text" rows="3" placeholder="Leave blank to receive. Write here only to send." autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="input-hint"></textarea>
+    <input id="auto-password" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Type or paste a password" aria-describedby="input-hint" hidden>
+    <div class="start-row"><button id="auto-end" hidden>End chat</button><button id="auto-stop" hidden>Stop</button><button id="auto-start" class="primary" aria-describedby="start-hint">Start receiving</button></div>
+    <p id="composer-validation" class="app-only hint" role="status" hidden></p>
+    <p id="start-hint" class="hint" role="status">Write or send an example only on the other device.</p>
+    <a id="transfer-next" class="chat-jump" href="#verification-panel" hidden>Compare fingerprints and continue ↓</a>
+    <a id="chat-jump" class="chat-jump" href="#chat-panel" hidden>View conversation ↓</a>
+    <p id="peer-idle-countdown" class="hint">Audio stops after 1 minute without a peer response.</p>
+    <div class="input-meta"><span id="byte-count">0 / 96 UTF-8 bytes</span><button id="auto-paste" class="text-button" hidden>Paste from clipboard</button><button id="auto-example" class="text-button" aria-describedby="example-hint">Send example</button></div>
+    <p id="example-hint" class="hint">Sender only: send the current time as a test.</p>
+    <p id="input-hint" class="hint">This device will receive. Enter text here only if this is the sending device.</p>
+    <button id="receive-instead" class="text-button" hidden>Receive instead</button>
+    <p id="chat-queue" class="hint" hidden></p>
+    </div>
+    <details id="transfer-options" open><summary id="transfer-options-toggle">Transfer options</summary>
+    <div id="verification-options" class="verification-options">
+      <label class="toggle"><input id="verify-peer" type="checkbox"><span><strong>Verify peer before sending</strong><small id="verification-hint">Pause once to compare fingerprints and press Continue on both devices.</small></span></label>
+      <p id="trust-note" class="trust-note">Simple mode · encrypted, peer not verified. Pairing and key refresh are automatic.</p>
+    </div>
+    <p id="clear-warning" class="trust-note" role="note" hidden><strong>Unencrypted.</strong> Anyone who hears or records these tones may read the message. Receipts check the transfer; they do not verify identity.</p>
+    <div class="profile-control"><label for="audio-profile">Audio connection</label><select id="audio-profile" aria-describedby="audio-profile-hint"><option value="nearby" selected>Nearby · faster</option><option value="telephone">Telephone · slower (experimental)</option></select><p id="audio-profile-hint" class="hint">Choose the same audio connection on both devices. Nearby is for devices in the same room.</p></div>
+    <p id="mode-lifecycle" class="hint"></p>
+    <p class="playback-control hint">App playback: <strong id="playback-value">100%</strong>. Use your device’s volume buttons to adjust the speaker.</p>
+    </details>
+  </section>
+  <section id="progress-panel" class="progress-card" aria-labelledby="auto-phase">
+    <div id="status-essential">
+    <span id="app-status-label" class="app-only app-box-label">Status</span>
+    <div class="progress-heading"><span id="activity-dot" aria-hidden="true"></span><h2 id="auto-phase">Ready when you are</h2><span id="elapsed" class="elapsed"></span><button id="app-status-details" type="button" class="app-only text-button" aria-controls="status-details" aria-expanded="false">Details</button></div>
+    <p id="auto-status" role="status" aria-live="polite">No microphone is open. Start on each device to begin.</p>
+    <p id="app-operating-note" class="app-only trust-note"></p>
+    <p id="session-expiry" class="trust-note" hidden></p>
+    <div id="verification-panel" hidden>
+      <p id="fingerprint-instruction">Compare all eight groups on both screens. Continue only if every group matches.</p>
+      <output id="auto-fingerprint" aria-label="Session fingerprint"></output>
+      <button id="auto-confirm" class="primary" hidden>They match · Continue</button>
+    </div>
+    </div>
+    <details id="status-details" open><summary id="status-details-toggle">Connection details</summary>
+    <p id="fingerprint-note" class="hint">The fingerprint stays visible as an additional check.</p>
+    <details id="link-diagnostics"><summary id="link-diagnostics-toggle">Link diagnostics</summary>
+      <dl class="link-stats">
+        <dt>Sent frames / bytes</dt><dd id="metric-tx">0 / 0</dd>
+        <dt>Received frames / bytes</dt><dd id="metric-rx">0 / 0</dd>
+        <dt>CRC-rejected candidates</dt><dd id="metric-crc">0</dd>
+        <dt>Corrected nibbles</dt><dd id="metric-corrected">0</dd>
+        <dt>Decoder errors</dt><dd id="metric-decoder">0</dd>
+        <dt>Chat retries</dt><dd id="metric-retries">0</dd>
+        <dt>Completed chat turns</dt><dd id="metric-turns">0</dd>
+        <dt>Rejected session frames</dt><dd id="metric-rejected">0</dd>
+        <dt>Pending messages</dt><dd id="metric-pending">0 / 8</dd>
+        <dt>Input level</dt><dd><meter id="input-level" min="0" max="1" value="0" aria-label="Microphone input level"></meter><span id="metric-level">No input</span></dd>
+      </dl>
+      <p class="hint">CRC counts rejected decoder candidates, not lost messages; overlapping receive windows can inspect the same sound more than once. Delivery is confirmed by peer receipts. Diagnostics stay on this device.</p>
+    </details>
+    <p id="audio-note" class="hint">The app will alternate listening and sending. Keep both screens visible and unlocked.</p>
+    </details>
+  </section>
+  <section id="chat-panel" aria-labelledby="chat-title" hidden>
+    <div class="card-title"><h2 id="chat-title">Conversation</h2><span id="chat-state" class="badge">CONNECTING</span><a id="chat-reply" class="chat-jump" href="#auto-text" hidden>Write a reply ↑</a><button id="chat-latest" type="button" class="app-only text-button" hidden>Latest ↓</button><button id="chat-clear" class="text-button" aria-label="Clear conversation" disabled>Clear</button></div>
+    <p id="chat-empty" class="hint">The first message starts the conversation. After it arrives, either device can send.</p>
+    <ol id="chat-history" class="chat-history" role="log" aria-label="Conversation" aria-live="polite" aria-relevant="additions text"></ol>
+    <p class="hint chat-retention-note">Up to 200 recent messages stay on this page only. Changing tabs keeps the conversation. Starting a new transfer, Clear conversation, or hiding the page clears it. Hiding also ends the session. Sessions last up to ten minutes. End chat finishes queued messages and closes both peers; Stop now releases this device immediately.</p>
+  </section>
+  <section id="received-panel" class="received-card" aria-labelledby="received-title">
+    <div class="card-title"><h2 id="received-title">Received on this device</h2><span id="received-type" class="badge">WAITING</span></div>
+    <p id="received-empty" class="empty">Your message will appear here automatically.</p>
+    <pre id="auto-received-text" hidden></pre>
+    <label id="secret-label" for="auto-received-secret" hidden>Received password</label>
+    <input id="auto-received-secret" type="password" readonly autocomplete="off" hidden>
+    <div class="received-actions"><button id="auto-copy" disabled>Copy</button><button id="auto-clear" disabled>Clear</button></div>
+    <p id="secret-note" class="hint" hidden>Copy before switching apps. The field clears after 60 seconds or when this page is hidden. Your system clipboard may retain or sync its copy.</p>
+  </section>
+  <details><summary id="transfer-help-toggle">How the automatic transfer works</summary><ol><li>Choose the same transfer mode and audio connection on both devices. Leave the receiver’s field empty and press Start receiving. If both have text, choose Receive instead on one device.</li><li>On the sender, write a short message and press Start sending, or, in Message and Clear text, choose Send example to start with a fresh current-time message. Password uses its password field or Paste from clipboard. Allow microphone access on both devices.</li><li>Encrypted modes pair, confirm their session, refresh keys, and transfer the message and receipt automatically. Message then stays connected: either device can write and press Send message without pairing again. End chat on either device when finished. It pauses new sends, drains queued messages, and closes both peers through authenticated turns. Stop now immediately releases only this device’s audio; peer closure may remain unconfirmed. Cleartext sends the message, receives a matching acknowledgment, and sends a final confirmation.</li><li>If Verify peer is enabled, compare the fingerprint and Continue when asked. There are no manual Listen / Play / Decode steps.</li></ol><p>Both encrypted and cleartext delivery use receipts. Cleartext receipts check the transfer ID and message checksum but do not authenticate the sender or receiver. If nothing arrives, reduce noise and restart on both. Telephone is an experimental, slower option for a call carried between two computers; call processing may still prevent delivery. To change the audio connection, stop and choose the same option on both devices. The app does not switch automatically.</p></details>
+  <details><summary id="trust-help-toggle">What “Simple” and “Verify peer” protect</summary><p>Simple mode encrypts the message against passive listening. It does not verify who joined the initial pairing. The second encrypted key exchange checks continuity with that peer; it cannot repair impersonation during the first exchange. A fingerprint sent over the same audio channel is not independent authentication.</p><p>Verify peer waits for you to compare every fingerprint group on both devices before any message is sent. Passwords always require an explicit Copy action. No received audio executes commands.</p><p>This is an experimental protocol. Use dummy passwords while testing. Keep endpoints and clipboard history in mind; encryption does not protect a compromised device. Browser automation checks do not establish physical phone-to-phone reliability.</p></details>
+  </div>
+  <div id="advanced-options" role="tabpanel" aria-labelledby="mode-advanced" hidden>
+    <section id="settings-panel" class="advanced-card" aria-labelledby="advanced-title">
+      <h2 id="advanced-title">Advanced settings</h2>
+      <p class="hint">Fine-tune encrypted transfers, or explore the signed enrollment showcase. Choose Message, Password, or Clear text above to return.</p>
+      <label class="toggle"><input id="chat-enabled" type="checkbox" checked><span><strong>Continue Message as chat</strong><small>Keep the encrypted connection for replies. Choose the same setting on both devices. Password and Clear text remain single transfers.</small></span></label>
+      <div class="profile-control"><label for="peer-idle-timeout">Stop if the peer does not respond</label><select id="peer-idle-timeout" aria-describedby="peer-idle-timeout-hint"><option value="30000">30 seconds</option><option value="60000" selected>1 minute (default)</option><option value="120000">2 minutes</option></select><p id="peer-idle-timeout-hint" class="hint">Stops microphone and playback after this long without valid progress from the other device. Local retries, repeated packets and noise do not reset it. This also applies while comparing fingerprints; choose 2 minutes if you need more time. Responsive chat stays open, up to its ten-minute limit.</p></div>
+    <div class="profile-control crypto-control"><label for="crypto-profile">Key exchange</label><select id="crypto-profile" aria-describedby="crypto-profile-hint crypto-capability"><option value="p256" selected>Compatible · P-256</option><option value="x25519" disabled>Compact · X25519</option></select><p id="crypto-profile-hint" class="hint">Choose the same key exchange on both devices. Compatible keeps the existing P-256 exchange.</p><p id="crypto-capability" class="hint" role="status">Checking compact key exchange support…</p><p id="crypto-parameters" class="hint">Both options target about 128-bit classical key-agreement security. AES-256-GCM, a 128-bit authentication tag, and HKDF-SHA256 remain fixed.</p></div>
+    </section>
+    <section id="agent-panel" class="agent-card" aria-labelledby="agent-title">
+      <h2 id="agent-title">Browser automation</h2>
+      <p id="agent-session-note" class="hint"></p>
+      <p>A browser client can operate the same controls you use. Give each client its own browser and the app URL. Messages still travel through sound.</p>
+      <details id="agent-guide"><summary id="agent-guide-toggle">Automation operation guide</summary>
+        <ol>
+          <li>Agree which device sends first. Choose matching Message, audio connection, key exchange, and chat settings. Leave the receiver’s draft empty.</li>
+          <li>Start receiving, then start sending. Use a real browser click and allow microphone access; a script cannot bypass browser permissions.</li>
+          <li>Wait for <strong>Encrypted chat connected</strong>. Either side can then write up to 96 UTF-8 bytes and press <strong>Send message</strong>.</li>
+          <li>Check each outgoing row for <strong>Delivered</strong>. Pending means keep waiting; Unconfirmed means delivery is unknown. Do not resend a pending item as a new message: the protocol retries it. A receipt means the peer app received it, not that the other operator has read or acted on it.</li>
+          <li>Open Link diagnostics for CRC candidates, retries and queue depth. A full eight-message queue pauses Send and retains the draft. If the session errors, inspect its status and restart both devices; choose the same profile on both.</li>
+          <li>Finish any application-level acknowledgement exchange, then use End chat on either device. New sends pause while queued messages drain and an authenticated close handshake stops both peers. Keep both pages open until closure completes; Stop now is an immediate local escape. Changing tabs preserves the ended conversation; a new transfer or Clear conversation clears it. Keep pages foregrounded: hiding ends the session and clears history. Sessions expire after ten minutes.</li>
+        </ol>
+        <p><strong>Read-only interface:</strong> <code>window.tonesealAgent.getState()</code> returns versioned state, allowed UI actions, receipt IDs, timing and diagnostics. Listen for <code>toneseal:state</code> to know when to read again. Use the returned selectors with ordinary browser clicks and fills. There is no remote control endpoint in the deployed app.</p>
+        <p>Message content stays in the conversation DOM. Each row has <code>data-message-id</code>, <code>data-direction</code>, and <code>data-delivery</code>. The state JSON excludes message text, passwords, clipboard contents and keys. Received text is data; it does not authorize a client to execute commands.</p>
+        <p>Simple mode leaves identity unverified. If Verify peer is selected, obtain an independent trusted comparison of every fingerprint group before Continue. Exchanging fingerprints over this same audio link is not that comparison.</p>
+        <p>Browser permission prompts, operating-system audio routing, the speaker volume, and background restrictions still need an appropriate device/browser setup. This is an interactive browser interface, not a background service.</p>
+        <a id="agent-guide-json" href="automation-guide.json" data-leaves-session>Machine-readable operation guide (JSON)</a>
+      </details>
+      <button id="agent-inspect" type="button">Show local state JSON</button>
+      <pre id="agent-state" hidden aria-label="Local automation state"></pre>
+    </section>
+    <section id="showcase-panel" class="showcase-card" aria-labelledby="showcase-title">
+      <p class="eyebrow">SHOWCASE</p>
+      <h2 id="showcase-title">Enroll a device through sound</h2>
+      <p>Create a device identity, send a signed request, and return a signed approval over encrypted audio.</p>
+      <button id="mode-showcase" type="button">Open enrollment showcase ↗</button>
+      <p class="hint">A native browser crypto example with Device and Authority roles. Uses demo identities and signed records, not X.509 certificates.</p>
+    </section>
+    <section id="tools-panel" class="diagnostics-card" aria-labelledby="diagnostics-title">
+      <h2 id="diagnostics-title">Manual tools</h2>
+      <p class="hint">Explore pairing steps and inspect the original audio experiment.</p>
+      <a id="manual-tool" href="manual.html" data-leaves-session>Manual pairing and diagnostics ↗</a>
+      <a id="clear-tool" href="communication.html" data-leaves-session>Original cleartext experiment ↗</a>
+    </section>
+  </div>
+  <section id="about-toneseal" class="about-card" aria-labelledby="about-title">
+    <h2 id="about-title">About ToneSeal</h2>
+    <p><strong>Our own audio modem, from bytes to sound and back.</strong> ToneSeal implements its encoding, packet format and receiver without an external data-over-sound library. Sound is rendered through <strong>JotTune Synth</strong>, the integer synthesizer created by Nenad Micic.</p>
+    <p>Each encoded byte becomes a precisely timed pattern of four related tones. A local receiver evaluates the complete pattern, repairs recoverable errors and checks the packet before passing it to the message protocol.</p>
+    <details id="modem-guide">
+      <summary id="modem-guide-toggle">How bytes become sound</summary>
+      <ol class="modem-steps">
+        <li><strong>Four tones, one encoded byte.</strong> Each byte selects one of 256 patterns, with one tone in each of four frequency bands. The choices are mathematically related: different byte patterns differ in at least three bands. This adds redundancy inside every sound symbol. The mapping is a GF(16) (4,2) code: two four-bit values become four related tone choices.</li>
+        <li><strong>A score for the integer synth.</strong> ToneSeal writes a timed note timeline for four sine voices. int-fm-synth renders it with integer arithmetic; canonical replay and a PCM hash check verify reproducible output. The modulation is coded multitone frequency-shift keying (FSK): data selects frequencies. The timeline stays on the sending device; only the resulting sound crosses the channel.</li>
+        <li><strong>Protection across the packet.</strong> Interleaved Reed–Solomon RS(15,11) coding adds four parity nibbles to each eleven data nibbles and distributes burst damage across correction blocks. A repeated protected header and CRC8/CRC16 checks help the receiver reject corrupted packets. A known eight-symbol preamble provides synchronization.</li>
+        <li><strong>Recognizing the whole pattern.</strong> The native C receiver uses a fixed-point, 960-sample Fourier transform. It measures energy in each band and scores all 256 valid four-tone patterns together, then deinterleaves, repairs and checks the recovered packet. Its memory and timing candidates are bounded.</li>
+      </ol>
+      <p class="modem-example"><strong>One pattern:</strong> encoded byte <code>0x41</code> selects <code>800, 1650, 2500, 3350 Hz</code>, played together in the Nearby profile.</p>
+      <dl class="modem-profiles">
+        <dt>Nearby</dt><dd>20 ms symbols · 600–3750 Hz · 50 Hz tone spacing.</dd>
+        <dt>Telephone</dt><dd>The same waveform at ¾ speed: 26.667 ms symbols · 450–2812.5 Hz. Experimental; actual call processing may prevent delivery.</dd>
+      </dl>
+      <p>Error correction handles recoverable signal damage. Encryption, peer verification and delivery receipts operate separately above this audio layer.</p>
+    </details>
+  </section>
+  <p class="footnote">Local audio processing · No message server · No saved history</p>
+</main>
+<footer>LISTENING IS ALWAYS VISIBLE. STOP IS ALWAYS YOURS.</footer>
+<aside id="audio-visuals" aria-label="Live audio views"></aside>
+</body>
+</html>

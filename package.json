@@ -1,0 +1,38 @@
+{
+  "name": "toneseal",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Experimental browser messaging over sound, powered by JotTune Synth",
+  "scripts": {
+    "build": "python3 scripts/build-web.py",
+    "test": "python3 tests/build-web.py && node --test tests/session.mjs tests/auto-transfer.mjs tests/demo-identity.mjs tests/artifact-transfer.mjs tests/chat-transfer.mjs tests/audio-visual-taps.mjs tests/peer-idle.mjs tests/codec-vectors.mjs",
+    "test:simulation": "node tests/simulated-transfer.mjs",
+    "test:acoustic": "node tests/acoustic-impairments.mjs",
+    "test:telephone": "node tests/telephone-channel.mjs",
+    "test:profiles": "node tests/telephone-profiles.mjs",
+    "test:throughput": "node tests/session-throughput.mjs",
+    "test:crypto-audio": "node tests/crypto-audio.mjs",
+    "test:showcase": "node tests/pki-demo-browser.mjs",
+    "test:mobile": "node tests/mobile-navigation.mjs",
+    "test:app": "node tests/app-view-browser.mjs",
+    "test:visuals": "node tests/audio-visual-browser.mjs",
+    "test:chat": "node tests/chat-simulation.mjs && node tests/chat-close-simulation.mjs && node tests/chat-browser.mjs",
+    "test:report": "node scripts/render-test-report.mjs",
+    "test:e2e": "npm run build && npm test && npm run test:simulation && npm run test:acoustic && npm run test:throughput && npm run test:crypto-audio && node tests/auto-audio-link.mjs && node tests/auto-browser.mjs && node tests/auto-render-browser.mjs && npm run test:showcase && npm run test:mobile && npm run test:app && npm run test:visuals && npm run test:chat && npm run test:automation && npm run test:report",
+    "serve": "python3 scripts/serve.py --directory dist",
+    "test:automation": "node tests/automation-browser.mjs",
+    "test:room": "node tests/browser-room.mjs --channel pcm"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nmicic/toneseal.git"
+  },
+  "devDependencies": {
+    "playwright": "1.64.1"
+  }
+}

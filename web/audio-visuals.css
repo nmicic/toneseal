@@ -1,0 +1,56 @@
+/* Copyright (c) 2026 Nenad Micic */
+/* SPDX-License-Identifier: Apache-2.0 */
+/* ChimePond's warm paper/coral shell around the synth's dark live plots. */
+body.has-audio-visuals { padding-bottom: calc(var(--audio-visual-height, 136px) + 16px); }
+html:has(body.has-audio-visuals) { scroll-padding-bottom: calc(var(--audio-visual-height, 136px) + 16px); }
+.audio-visual-dock {
+  position: fixed; inset: auto 0 0; z-index: 25;
+  margin: 0; padding: 0 0 env(safe-area-inset-bottom, 0px);
+  border-top: 1px solid var(--site-line, rgba(25,42,45,.18));
+  background: var(--site-paper, #f3efe7); color: var(--site-ink, #192a2d);
+  box-shadow: 0 -5px 20px rgba(25,42,45,.06);
+  font: 12px/1.4 var(--site-body-font, system-ui);
+}
+.audio-visual-inner { max-width: 800px; margin: 0 auto; padding: 0 26px 7px; }
+.audio-visual-toolbar { display: flex; align-items: center; gap: 8px; min-height: 44px; }
+.audio-visual-views { display: flex; min-width: 0; gap: 3px; flex: 1; }
+.audio-visual-dock button {
+  flex: 1; min-width: 44px; min-height: 44px; margin: 0; padding: 6px 7px;
+  border: 0; border-radius: 0; background: transparent; color: #536164;
+  font: 600 13px/1.3 var(--site-body-font, system-ui), sans-serif;
+  white-space: nowrap; cursor: pointer;
+}
+.audio-visual-dock button[aria-pressed=true] { color: #192a2d; box-shadow: inset 0 -2px var(--site-accent, #df5d44); }
+.audio-visual-dock button:hover { background: #eae4d9; }
+.audio-visual-dock button:focus-visible { outline: 2px solid var(--site-accent, #df5d44); outline-offset: -3px; }
+#audio-visual-collapse { flex: 0 0 44px; font-size: 18px; padding: 4px; }
+.audio-visual-compact { flex: 1; font-size: 12px; font-weight: 600; color: #536164; }
+.audio-visual-readings { display: flex; justify-content: space-between; gap: 8px; min-height: 20px; color: #536164; font-size: 11px; }
+#audio-visual-status { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#audio-visual-range { flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.audio-visual-plot { height: 64px; border-radius: 6px; overflow: hidden; background: #101a20; }
+#audio-visual-canvas { display: block; width: 100%; height: 100%; }
+.audio-visual-unavailable { display: grid; place-items: center; height: 100%; padding: 8px 12px; box-sizing: border-box; color: #a9c0cc; text-align: center; font-size: 11px; }
+.audio-visual-peaks { display: grid; gap: 4px; padding: 10px 12px; }
+.audio-visual-peak { display: grid; grid-template-columns: 75px minmax(0,1fr) 78px; align-items: center; gap: 8px; min-height: 20px; }
+.audio-visual-peak label { margin: 0; color: #a9c0cc; font-size: 11px; }
+.audio-visual-peak meter { display: block; width: 100%; height: 13px; accent-color: #87d7b3; }
+.audio-visual-peak output { color: #a9c0cc; text-align: right; font: 10px/1.4 ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+.audio-visual-dock[data-collapsed=true] .audio-visual-inner { padding-bottom: 0; }
+.audio-visual-dock [hidden] { display: none !important; }
+@media (max-width: 520px) {
+  .audio-visual-inner { padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
+  .audio-visual-toolbar { gap: 3px; }
+  .audio-visual-views { gap: 0; }
+  .audio-visual-dock button { font-size: 12px; padding-left: 4px; padding-right: 4px; }
+  .audio-visual-readings { font-size: 10px; }
+  .audio-visual-peak { grid-template-columns: 68px minmax(0,1fr) 75px; gap: 5px; }
+}
+@media (max-height: 430px) {
+  .audio-visual-plot { height: 48px; }
+  .audio-visual-peaks { padding: 3px 10px; gap: 0; }
+  .audio-visual-readings { min-height: 17px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .audio-visual-dock *, .audio-visual-dock *::before, .audio-visual-dock *::after { animation: none !important; transition: none !important; }
+}

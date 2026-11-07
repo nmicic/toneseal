@@ -1,0 +1,12 @@
+/build/
+/dist/
+/out/
+/node_modules/
+/web/communication-decoder.wasm
+/.toneseal-site-*/
+.DS_Store
+__pycache__/
+*.pyc
+
+.env
+.env.*

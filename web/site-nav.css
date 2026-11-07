@@ -1,0 +1,111 @@
+/* Copyright (c) 2026 Nenad Micic */
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Keep the radio character in the wordmark and use a reading typeface for
+   the working interface. Both fonts are served locally with the app. */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('fonts/InterVariable.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Michroma';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('fonts/Michroma-Regular.woff2') format('woff2');
+}
+:root {
+  --site-body-font: 'Inter', system-ui, sans-serif;
+  --site-display-font: 'Michroma', 'Eurostile Extended', 'Arial Narrow', sans-serif;
+  --site-paper: #f3efe7;
+  --site-ink: #192a2d;
+  --site-accent: #df5d44;
+  --site-action: #2e4546;
+  --site-line: rgba(25, 42, 45, .18);
+  --site-header-height: 128px;
+  color-scheme: light;
+  background: var(--site-paper);
+}
+html { scroll-padding-top: calc(var(--site-header-height) + 16px); }
+body { margin: 0; background: var(--site-paper); font-family: var(--site-body-font); font-optical-sizing: auto; }
+#site-header, #site-header * { box-sizing: border-box; }
+#site-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: block;
+  width: 100%;
+  max-width: none;
+  height: auto;
+  margin: 0;
+  padding: env(safe-area-inset-top, 0px) 0 0;
+  border: 0;
+  border-bottom: 1px solid var(--site-line);
+  color: var(--site-ink);
+  background: var(--site-paper);
+  font: 14px/1.4 var(--site-body-font);
+}
+.site-header-inner { max-width: 800px; margin: auto; padding: 0 26px; }
+.site-brand-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 55px; }
+#site-header .brand {
+  display: inline-flex; align-items: center; gap: 9px; min-height: 44px;
+  color: inherit; font-family: var(--site-display-font); font-size: 18px; line-height: 1.25; font-weight: 400;
+  letter-spacing: .11em; text-transform: uppercase; text-decoration: none; white-space: nowrap;
+}
+#site-header .brand span { display: grid; place-items: center; width: 27px; height: 27px; border-radius: 50%; background: var(--site-accent); color: #fff; font-family: ui-sans-serif, sans-serif; font-size: 25px; letter-spacing: 0; }
+h1, h2 { font-family: var(--site-body-font); font-weight: 600; }
+h1 { letter-spacing: -.025em; }
+h2 { letter-spacing: -.015em; }
+button.primary {
+  font-family: var(--site-body-font); font-weight: 600; letter-spacing: normal;
+  text-transform: none; color: #fff; background: var(--site-action); border-color: var(--site-action);
+}
+button.primary:hover:not(:disabled) { background: #223637; border-color: #223637; }
+.site-caption { color: #536164; font-size: 10px; letter-spacing: .08em; }
+#site-header .quiet-link { display: inline-flex; align-items: center; min-height: 44px; color: #536164; font-size: 12px; line-height: 1.3; text-align: right; text-decoration: underline; text-decoration-color: var(--site-accent); text-underline-offset: 4px; }
+#site-nav {
+  position: static; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 3px; width: 100%; margin: 0; padding: 0; border: 0; background: transparent;
+}
+#site-nav > a, #site-nav > button {
+  display: flex; align-items: center; justify-content: center;
+  min-width: 0; min-height: 46px; margin: 0; padding: 10px 4px;
+  border: 0; border-bottom: 3px solid transparent; border-radius: 6px 6px 0 0;
+  color: #536164; background: transparent;
+  font-family: var(--site-body-font); font-size: 14px; line-height: 1.4; font-weight: 600;
+  text-align: center; white-space: nowrap; text-decoration: none;
+}
+#site-nav > a:hover, #site-nav > button:hover:not(:disabled) { background: #eae4d9; }
+#site-nav > [aria-current], #site-nav > [aria-selected="true"] { color: var(--site-ink); border-bottom-color: var(--site-accent); background: #eae4d9; }
+#site-nav > button:disabled { opacity: .45; }
+#site-header a:focus-visible, #site-header button:focus-visible { outline: 3px solid var(--site-accent); outline-offset: 2px; }
+.site-location { display: flex; align-items: center; gap: 7px; min-height: 29px; margin: 0; color: #536164; font-size: 11px; line-height: 1.4; }
+.site-location a { color: inherit; text-decoration: none; }
+.site-location strong { color: var(--site-ink); font-weight: 600; }
+/* Encryption is named in text as well as colour; it is not an identity claim. */
+#site-location[data-protection] { padding: 2px 7px; border-radius: 4px; }
+#site-location[data-protection=encrypted] { color: #285e4c; background: #e7f1eb; }
+#site-location[data-protection=clear] { color: #87500f; background: #fff1dc; }
+#site-nav :is(#mode-message,#mode-password)[aria-selected=true] { color: #285e4c; border-bottom-color: #285e4c; background: #e7f1eb; }
+#site-nav #mode-clear[aria-selected=true] { color: #87500f; border-bottom-color: #87500f; background: #fff1dc; }
+#transfer-panel, #advanced-options { scroll-margin-top: 16px; }
+/* Page-local role controls stay below the shared site navigation. */
+main > .mode-tabs { top: var(--site-header-height); z-index: 20; background: var(--site-paper); }
+@media (max-width: 520px) {
+  .site-header-inner { padding-left: max(18px, env(safe-area-inset-left)); padding-right: max(18px, env(safe-area-inset-right)); }
+  .site-brand-row { min-height: 49px; }
+  #site-nav { gap: 2px; }
+  #site-nav > a, #site-nav > button { font-size: 14px; padding-left: 2px; padding-right: 2px; }
+  .site-caption { font-size: 9px; letter-spacing: .02em; }
+  #site-header .quiet-link { font-size: 11px; }
+  .site-location { min-height: 27px; font-size: 10px; }
+}
+@media (max-height: 430px) and (orientation: landscape) {
+  .site-brand-row { min-height: 44px; }
+  .site-location { min-height: 23px; }
+}
+@media (max-width: 360px) {
+  #site-nav > a, #site-nav > button { font-size: 13px; }
+}

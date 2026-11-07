@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow,noarchive"><meta name="referrer" content="no-referrer">
+  <meta name="color-scheme" content="light"><title>ToneSeal · Signed enrollment showcase</title>
+  <link rel="stylesheet" href="auto-app.css"><link rel="stylesheet" href="pki-demo.css"><script type="module" src="pki-demo.mjs"></script>
+  <link rel="stylesheet" href="site-nav.css"><script type="module" src="site-nav.mjs"></script>
+</head>
+<body>
+<header id="site-header">
+  <div class="site-header-inner">
+    <div class="site-brand-row"><a href="./" class="brand" aria-label="ToneSeal home"><span aria-hidden="true">≋</span> ToneSeal</a><a href="./?advanced=1" class="quiet-link">← Back to Advanced</a></div>
+    <nav id="site-nav" aria-label="ToneSeal">
+      <a href="./?mode=message">Message</a>
+      <a href="./?mode=password">Password</a>
+      <a href="./?mode=clear">Clear text</a>
+      <a href="./?advanced=1" aria-current="page">Advanced</a>
+    </nav>
+    <p class="site-location site-context" aria-label="Current location"><span>Advanced</span><span aria-hidden="true">/</span><strong id="site-location">Enrollment showcase</strong></p>
+  </div>
+</header>
+<main>
+  <div class="eyebrow">TWO BROWSERS. ONE SIGNED APPROVAL.</div>
+  <h1>Enroll through sound.</h1>
+  <p class="lede">A device asks to join. An authority inspects the request and signs a reply. The device accepts only after you pin the authority’s fingerprint.</p>
+  <p class="demo-boundary"><strong>Signed enrollment example; not an X.509 certificate authority.</strong><br>Native browser keys stay in memory. Reloading or closing this page loses them. Reset clears this demonstration.</p>
+  <div class="mode-tabs" role="group" aria-label="Showcase role"><button id="role-device" class="active" aria-pressed="true">Device</button><button id="role-authority" aria-pressed="false">Authority</button></div>
+  <p id="role-hint" class="hint">Use Device here and Authority on the other browser. Keep both pages visible.</p>
+
+  <section id="device-panel" aria-labelledby="device-title">
+    <h2 id="device-title">Device · ask to join</h2>
+    <div class="demo-step"><span class="step-number">1</span><div><h3>Create this device’s identity</h3><label for="device-name">Device name</label><input id="device-name" type="text" maxlength="32" value="Demo device" autocomplete="off" spellcheck="false"><button id="create-device">Create device identity</button><div id="device-identity" hidden><p class="hint">Device public-key fingerprint</p><output id="device-fingerprint" class="fingerprint"></output><p class="hint">The enrollment request expires after one hour. Its private key stays in this page.</p></div></div></div>
+    <div class="demo-step"><span class="step-number">2</span><div><h3>Send the enrollment request</h3><p>On Authority, create its identity and press <strong>Receive request</strong>. Then send from here. Compare the transport fingerprint and Continue on both browsers.</p><button id="send-enrollment" class="primary" disabled>Send request</button></div></div>
+    <div class="demo-step"><span class="step-number">3</span><div><h3>Receive the signed reply</h3><p>After the request is delivered, press Receive reply here. On Authority, inspect the request, approve it, and send the reply. Compare the new transport fingerprint on both browsers.</p><button id="receive-approval" disabled>Receive reply</button></div></div>
+    <div id="approval-panel" class="demo-step" hidden><span class="step-number">4</span><div><h3>Pin the authority, then accept</h3><p id="approval-description"></p><p class="hint">UNTRUSTED · signer fingerprint carried in this reply</p><output id="received-authority-fingerprint" class="fingerprint"></output><label for="authority-pin">Trusted authority fingerprint</label><textarea id="authority-pin" rows="3" placeholder="Enter all 64 hexadecimal characters from the authority’s own screen" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="pin-hint"></textarea><p id="pin-hint" class="hint">Obtain this fingerprint from the authority through a trusted comparison. The value inside a received reply alone is not a trust anchor. The app never fills this field for you.</p><button id="accept-approval" class="primary" disabled>Trust this fingerprint and accept</button><p id="acceptance-status" role="status"></p></div></div>
+  </section>
+
+  <section id="authority-panel" aria-labelledby="authority-title" hidden>
+    <h2 id="authority-title">Authority · inspect and approve</h2>
+    <div class="demo-step"><span class="step-number">1</span><div><h3>Create the demo authority</h3><label for="authority-name">Authority name</label><input id="authority-name" type="text" maxlength="32" value="Demo authority" autocomplete="off" spellcheck="false"><button id="create-authority">Create authority identity</button><div id="authority-identity" hidden><p class="hint">Authority public-key fingerprint · share this through a trusted comparison</p><output id="authority-fingerprint" class="fingerprint"></output></div></div></div>
+    <div class="demo-step"><span class="step-number">2</span><div><h3>Receive the device’s request</h3><p>Press Receive request here, then Send request on Device. Compare the transport fingerprint and Continue on both browsers.</p><button id="receive-enrollment" class="primary" disabled>Receive request</button></div></div>
+    <div id="enrollment-panel" class="demo-step" hidden><span class="step-number">3</span><div><h3>Inspect and approve</h3><dl class="demo-facts"><dt>Device</dt><dd id="request-name"></dd><dt>Request</dt><dd id="request-id"></dd><dt>Valid until</dt><dd id="request-expiry"></dd></dl><p class="hint">Device public-key fingerprint</p><output id="request-fingerprint" class="fingerprint"></output><p class="hint">The request proves possession of this key. Decide independently whether this device is allowed to enroll.</p><button id="approve-enrollment" disabled>Approve this request</button><p id="approval-ready" class="hint"></p><p>On Device, press <strong>Receive reply</strong>. Then send the signed reply from here. The device must pin this authority’s fingerprint before accepting.</p><button id="send-approval" class="primary" disabled>Send signed reply</button></div></div>
+  </section>
+
+  <section class="progress-card" aria-labelledby="demo-phase"><div class="progress-heading"><span id="activity-dot" aria-hidden="true"></span><h2 id="demo-phase">Choose a role and create its identity</h2></div><p id="demo-status" role="status" aria-live="polite">No microphone is open.</p><p id="demo-progress" class="hint"></p><div id="demo-verification" hidden><p>Compare every transport fingerprint group on both browsers. Continue only if all groups match.</p><output id="demo-fingerprint" class="fingerprint"></output><button id="demo-confirm" class="primary">They match · Continue</button><p class="hint">This verifies this audio exchange. Accepting a signed reply still requires the separate authority fingerprint above.</p></div><button id="demo-stop" hidden>Stop audio</button><p id="demo-notice" class="hint" role="status"></p></section>
+
+  <details id="demo-connection"><summary>Audio connection and key exchange</summary><p class="hint">Choose the same options on both browsers before each transfer. Fingerprint confirmation is required for this showcase.</p><div class="profile-control"><label for="demo-audio-profile">Audio connection</label><select id="demo-audio-profile"><option value="nearby">Nearby · faster</option><option value="telephone">Telephone · slower (experimental)</option></select></div><div class="profile-control"><label for="demo-crypto-profile">Key exchange</label><select id="demo-crypto-profile"><option value="p256">Compatible · P-256</option><option value="x25519" disabled>Compact · X25519</option></select><p id="demo-crypto-support" class="hint">Checking compact key exchange support…</p></div><p class="playback-control hint">App playback: 100%. Adjust your device’s speaker volume as needed.</p></details>
+  <div class="reset-row"><button id="demo-reset">Reset this demonstration</button><p class="hint">Reset stops audio and discards this page’s identities, requests, replies, and trust decision. Hiding the page stops audio; keys remain until Reset, reload, or page close.</p></div>
+  <p class="footnote">No uploads · No private-key export · No saved identities<br>Approval demonstrates a signature and a pinned authority; it does not install a system certificate or execute commands.</p>
+</main><footer>DEMONSTRATION ONLY. TRUST IS AN EXPLICIT DECISION.</footer>
+</body></html>
