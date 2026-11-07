@@ -20,9 +20,9 @@ def build(output, wasm=False, cc=None):
         temporary = Path(directory) / output.name
         if wasm:
             command = shlex.split(cc or os.environ.get('ZIG', 'zig')) + ['cc', '-target', 'wasm32-freestanding',
-                '-std=c99', '-O2', '-ffreestanding', '-fno-builtin', '-nostdlib', '-I', str(NATIVE / 'freestanding'),
+                '-std=c99', '-O2', '-g0', '-ffreestanding', '-fno-builtin', '-nostdlib', '-I', str(NATIVE / 'freestanding'),
                 '-Wl,--no-entry', '-Wl,--export-memory', '-Wl,-z,stack-size=65536',
-                '-Wl,--initial-memory=262144', '-Wl,--max-memory=262144']
+                '-Wl,--initial-memory=262144', '-Wl,--max-memory=262144', '-Wl,--strip-all']
             command += ['-Wl,--export=acoustic_' + name for name in EXPORTS]
             sources = ['portable_core.c', 'wasm_adapter.c', 'wasm_runtime.c']
         else:

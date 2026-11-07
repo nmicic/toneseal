@@ -15,7 +15,8 @@ const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'jottune-acoustic-'));
 function run(command,values,input){const result=spawnSync(command,values,{input,encoding:'utf8',maxBuffer:4*1024*1024,timeout:60000});assert.equal(result.status,0,result.stderr||result.error?.message);return result.stdout;}
 let checks=0;function check(value,message){assert.ok(value,message);checks++;}
 try {
- const module=await WebAssembly.compile(fs.readFileSync(wasm));check(WebAssembly.Module.imports(module).length===0,'standalone decoder imports no network/WASI/engine runtime');
+ const wasmBytes=fs.readFileSync(wasm),module=await WebAssembly.compile(wasmBytes);check(WebAssembly.Module.imports(module).length===0,'standalone decoder imports no network/WASI/engine runtime');
+ check(['.debug_info','.debug_abbrev','.debug_line','.debug_str'].every(name=>WebAssembly.Module.customSections(module,name).length===0)&&!wasmBytes.includes(Buffer.from(lab)),'release decoder excludes debug metadata and checkout paths');
  const identity=run(harness,['--engine']).trim().slice(7);
  const fixtures=JSON.parse(fs.readFileSync(new URL('./fixtures/codec-vectors.json',import.meta.url),'utf8')).vectors;
  const vectors=fixtures.map(({payload,sender})=>({payload,sender})),expected=fixtures.map(row=>row.encoded);
