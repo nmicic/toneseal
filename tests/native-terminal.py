@@ -77,13 +77,32 @@ class Terminal(unittest.TestCase):
             text = b'\x1b]52;c;not-a-clipboard-write\x07\r\n/end'
             result = subprocess.run([CLI, 'encode', '--output', str(name)], input=text, capture_output=True, timeout=30)
             self.assertEqual(result.returncode, 0, result.stderr)
-            child, master, slave = self.open(['decode', '--input', str(name)])
+            timeline = Path(temporary)/'control.tl'
+            result = subprocess.run([CLI, 'text', 'to-tl', '--output', str(timeline)], input=text, capture_output=True, timeout=30)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            for args in (['decode', '--input', str(name)], ['text', 'from-wav', '--input', str(name)],
+                         ['text', 'from-tl', '--input', str(timeline)]):
+                with self.subTest(command=args[:2]):
+                    child, master, slave = self.open(args)
+                    try:
+                        output = self.read(child, master); child.wait(timeout=5)
+                        self.assertEqual(child.returncode, 0, output)
+                        self.assertNotIn(b'\x1b', output)
+                        self.assertNotIn(b'\x07', output)
+                        self.assertIn(b'\\x1b]52;c;not-a-clipboard-write\\x07\\x0d\\x0a/end', output)
+                    finally:
+                        if child.poll() is None: child.kill(); child.wait()
+                        os.close(master); os.close(slave)
+
+    def test_04_timeline_parser_diagnostics_cannot_inject_terminal_controls(self):
+        with tempfile.TemporaryDirectory(prefix='toneseal-terminal-') as temporary:
+            timeline = Path(temporary)/'invalid.tl'
+            timeline.write_bytes(b'\x1b]52;c;not-a-clipboard-write\x07\n')
+            child, master, slave = self.open(['text', 'from-tl', '--input', str(timeline)])
             try:
                 output = self.read(child, master); child.wait(timeout=5)
-                self.assertEqual(child.returncode, 0, output)
-                self.assertNotIn(b'\x1b', output)
-                self.assertNotIn(b'\x07', output)
-                self.assertIn(b'\\x1b]52;c;not-a-clipboard-write\\x07\\x0d\\x0a/end', output)
+                self.assertEqual(child.returncode, 2, output)
+                self.assertNotIn(b'\x1b', output); self.assertNotIn(b'\x07', output)
             finally:
                 if child.poll() is None: child.kill(); child.wait()
                 os.close(master); os.close(slave)

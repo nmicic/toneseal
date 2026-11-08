@@ -33,7 +33,7 @@ revision if known; deployments may differ from the latest repository code.
   Rekeying confirms continuity; it does not authenticate that initial peer.
 - Verify peer depends on an independent comparison of every fingerprint group
   on trusted screens and confirmation on both devices.
-- Clear text and WAV diagnostics provide no confidentiality or peer
+- Clear text and TL/WAV file conversions provide no confidentiality or peer
   authentication. Playback completion is not a delivery receipt.
 - The native C client's encrypted modes share the browser trust model. It uses
   installed OpenSSL 3, PortAudio and the external JotTune Synth SDK. Passwords

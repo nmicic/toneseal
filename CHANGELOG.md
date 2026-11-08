@@ -19,6 +19,8 @@ Initial public-source release, prepared for publication.
   fingerprint verification, encrypted rekey, JSON events and WAV diagnostics.
 - Native/browser interoperability, shared-timeline loss/recovery tests, counter
   boundaries, terminal safety and Linux null-device audio lifecycle checks.
+- ToneSeal-specific `text to-tl/from-tl/to-wav/from-wav` commands, with canonical
+  synth replay, saved waveform hash validation and byte-exact UTF-8 round trips.
 - Independent framing fixtures, protocol/acoustic simulations, browser checks,
   mobile-layout checks and Linux/macOS continuous integration configuration.
 

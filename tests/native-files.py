@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import random
+import re
 import stat
 import struct
 import subprocess
@@ -163,5 +164,96 @@ class NativeFiles(unittest.TestCase):
         self.assertEqual(manifest['schemaVersion'], 1)
         self.assertEqual(manifest['maxTextBytes'], 96)
         self.assertFalse(manifest['automaticClipboard'])
+
+    def test_11_text_timeline_round_trip_is_byte_exact(self):
+        samples = [b'x', b'\x00', b' \r\n\t\x00  ', b'NEVER_EMBED_ME_IN_TL',
+                   '\ufeffe\u0301 \u00e9 \U0001f511\r\n\x00'.encode(), b'x'*96, ('\u00e9'*48).encode()]
+        for i, text in enumerate(samples):
+            with self.subTest(item=i):
+                source = self.name(f'{i}.txt'); source.write_bytes(text)
+                timeline = self.name(f'{i}.tl'); recovered = self.name(f'{i}-recovered.txt')
+                event = json.loads(self.run_cli('text', 'to-tl', '--input', source, '--output', timeline, '--json').stdout)
+                self.assertEqual(event['format'], 'tl'); self.assertFalse(event['encrypted'])
+                self.assertEqual(event['timelineBytes'], timeline.stat().st_size)
+                self.assertEqual(stat.S_IMODE(timeline.stat().st_mode), 0o600)
+                self.assertRegex(timeline.read_text(), r'(?m)^hash [0-9a-f]{16}$')
+                self.assertNotIn(b'NEVER_EMBED_ME_IN_TL', timeline.read_bytes())
+                self.run_cli('text', 'from-tl', '--input', timeline, '--output', recovered)
+                self.assertEqual(recovered.read_bytes(), source.read_bytes())
+                self.assertEqual(stat.S_IMODE(recovered.stat().st_mode), 0o600)
+                self.assertEqual(self.run_cli('text', 'from-tl', '--input', timeline).stdout, text)
+
+    def test_12_text_wav_round_trip_all_profiles_and_rates(self):
+        text = ' \ufeffe\u0301 \u00e9 \U0001f511\r\n\x00tail  '.encode()
+        source = self.name('source.txt'); source.write_bytes(text)
+        for profile in ('nearby', 'telephone'):
+            for rate in (44100, 48000):
+                with self.subTest(profile=profile, rate=rate):
+                    name = self.name(f'{profile}-{rate}.wav'); recovered = self.name(f'{profile}-{rate}.txt')
+                    event = json.loads(self.run_cli('text', 'to-wav', '--input', source, '--output', name, '--profile', profile, '--rate', rate, '--json').stdout)
+                    self.assertEqual(event['format'], 'wav')
+                    self.run_cli('text', 'from-wav', '--input', name, '--output', recovered, '--profile', profile)
+                    self.assertEqual(recovered.read_bytes(), source.read_bytes())
+                    self.assertEqual(self.run_cli('text', 'from-wav', '--input', '-', '--profile', profile, data=name.read_bytes()).stdout, text)
+
+    def test_13_timeline_pipes_and_comments_do_not_supply_the_text(self):
+        text = b'  Sound carries this text.\r\n\x00  '
+        timeline = self.run_cli('text', 'to-tl', data=text).stdout
+        for source in (timeline, timeline.replace(b'\n', b'\r\n'),
+                       b'# Bogus recovered text: DO NOT USE\n'+timeline,
+                       re.sub(rb'(?m)^hash [0-9a-f]{16}\n', b'', timeline)):
+            with self.subTest(bytes=len(source)):
+                self.assertEqual(self.run_cli('text', 'from-tl', '--input', '-', data=source).stdout, text)
+        event = json.loads(self.run_cli('text', 'from-tl', '--input', '-', '--json', data=timeline).stdout)
+        self.assertEqual(event['text'].encode(), text)
+
+    def test_14_timeline_hash_damage_and_input_limits_release_nothing(self):
+        timeline = self.run_cli('text', 'to-tl', data=b'dummy').stdout
+        saved_hash = re.search(rb'(?m)^hash ([0-9a-f]{16})$', timeline)
+        self.assertIsNotNone(saved_hash)
+        digest = saved_hash.group(1); wrong = (b'1' if digest[:1] == b'0' else b'0')+digest[1:]
+        altered_hash = timeline[:saved_hash.start(1)]+wrong+timeline[saved_hash.end(1):]
+        rows = [b'', b'not a timeline\n', timeline+b'\x00', b'x'*200001, altered_hash,
+                re.sub(rb'(?m)^fs 48000$', b'fs 44100', timeline),
+                re.sub(rb'(?m)^length_ns [0-9]+$', b'length_ns 1000000000000', timeline),
+                timeline.replace(b'on 600000 32767', b'on 650000 32767', 1)]
+        for i, source in enumerate(rows):
+            with self.subTest(item=i):
+                output = self.name(f'{i}.txt')
+                result = self.run_cli('text', 'from-tl', '--input', '-', '--output', output, data=source, code=2)
+                self.assertEqual(result.stdout, b''); self.assertFalse(output.exists())
+
+    def test_15_general_synth_sound_is_not_interpreted_as_text(self):
+        timeline = self.run_cli('text', 'to-tl', data=b'dummy').stdout
+        header = b'\n'.join(line for line in timeline.splitlines() if line and not line[:1].isdigit() and not line.startswith(b'hash '))+b'\n'
+        header = re.sub(rb'(?m)^length_ns [0-9]+$', b'length_ns 1000000000', header)
+        music = header+b'0 message 0 on 440000 32767\n500000000 message 0 off\n'
+        output = self.name('no-message.txt')
+        result = self.run_cli('text', 'from-tl', '--input', '-', '--output', output, data=music, code=1)
+        self.assertEqual(result.stdout, b''); self.assertFalse(output.exists())
+
+    def test_16_text_conversion_flags_and_no_overwrite(self):
+        timeline = self.name('message.tl')
+        self.run_cli('text', 'to-tl', '--output', timeline, data=b'dummy')
+        before = timeline.read_bytes()
+        self.run_cli('text', 'to-tl', '--output', timeline, data=b'replace', code=2)
+        self.assertEqual(timeline.read_bytes(), before)
+        output = self.name('keep.txt'); output.write_bytes(b'keep')
+        self.run_cli('text', 'from-tl', '--input', timeline, '--output', output, code=2)
+        self.assertEqual(output.read_bytes(), b'keep')
+        for action in ('to-tl', 'to-wav'):
+            for text in (b'', b'x'*97, b'\xed\xa0\x80'):
+                name = self.name(action+str(len(text)))
+                self.run_cli('text', action, '--output', name, data=text, code=2)
+                self.assertFalse(name.exists())
+        for args in (('to-tl', '--profile', 'telephone'), ('from-tl', '--rate', '44100'),
+                     ('to-tl', '--json'), ('to-tl', '--json', '--output', '-'),
+                     ('from-tl',), ('from-wav',), ('to-wav',), ('to-wav', '--output', '-'),
+                     ('to-tl', '--mode', 'password'), ('unknown',)):
+            with self.subTest(args=args): self.run_cli('text', *args, code=2)
+        self.assertIn(b'ToneSeal', self.run_cli('text', '--help').stdout)
+        manifest = json.loads(self.run_cli('capabilities').stdout)
+        self.assertIn('text', manifest['commands'])
+        self.assertEqual(manifest['textConversions']['actions'], ['to-tl', 'from-tl', 'to-wav', 'from-wav'])
 
 if __name__ == '__main__': unittest.main(verbosity=2)

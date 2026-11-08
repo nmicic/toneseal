@@ -87,15 +87,19 @@ void ts_pcm_free(ts_pcm *p) {
     if (p->samples) OPENSSL_clear_free(p->samples,p->frames*sizeof(int16_t));
     memset(p,0,sizeof(*p));
 }
-int ts_modem_render(const ts_packet *packet, ts_pcm *out, volatile sig_atomic_t *cancel, char *error, size_t cap) {
-    fms_player_t *player=NULL,*replay=NULL; fms_info_t info; char *timeline=NULL,*record=NULL;
-    size_t len=0,record_len; uint32_t position=0,written=0; int16_t buffer[113]; int ok=0;
+static int render_timeline(const char *timeline, size_t len, ts_pcm *out, char **canonical, size_t *canonical_len,
+                           volatile sig_atomic_t *cancel, char *error, size_t cap) {
+    fms_player_t *player=NULL,*replay=NULL; fms_info_t info; char *record=NULL;
+    size_t record_len; uint32_t position=0,written=0; int16_t buffer[113]; int ok=0;
     memset(out,0,sizeof(*out));
-    if (!ts_modem_timeline(packet->bytes,packet->len,0,&timeline,&len)) { snprintf(error,cap,"Cannot prepare the packet timeline."); goto done; }
+    if (canonical) { *canonical=NULL; *canonical_len=0; }
+    if (!len || len>TS_TIMELINE_MAX || memchr(timeline,0,len) || !ts_utf8_valid((const uint8_t *)timeline,len)) {
+        snprintf(error,cap,"Use a complete UTF-8 ToneSeal timeline, at most %u bytes, without NUL bytes.",TS_TIMELINE_MAX); goto done;
+    }
     if (cancel && *cancel) goto done;
     if (fms_player_import(timeline,len,NULL,&player,error,cap)!=FMS_OK) goto done;
     fms_player_info(player,&info);
-    if (info.fs!=48000 || info.channels!=1 || !info.frames || info.frames>48000*6u) { snprintf(error,cap,"Unexpected synth dimensions."); goto done; }
+    if (info.fs!=48000 || info.channels!=1 || !info.frames || info.frames>48000*6u) { snprintf(error,cap,"Use a mono 48 kHz ToneSeal timeline of at most six seconds."); goto done; }
     out->frames=info.frames; out->rate=info.fs; out->samples=malloc(out->frames*sizeof(int16_t));
     if (!out->samples) goto done;
     while (position<info.frames) {
@@ -105,7 +109,7 @@ int ts_modem_render(const ts_packet *packet, ts_pcm *out, volatile sig_atomic_t 
     }
     if (fms_player_clipped(player)) { snprintf(error,cap,"Synth waveform clipped."); goto done; }
     out->hash=fms_player_hash(player); record_len=fms_player_record_text(player,NULL,0);
-    if (!record_len || record_len>200000) { snprintf(error,cap,"Canonical synth record is unavailable."); goto done; }
+    if (!record_len || record_len>TS_TIMELINE_MAX+1u) { snprintf(error,cap,"Canonical synth record is unavailable."); goto done; }
     record=malloc(record_len); if (!record || fms_player_record_text(player,record,record_len)!=record_len) goto done;
     if (fms_player_import(record,record_len-1,NULL,&replay,error,cap)!=FMS_OK) goto done;
     for (position=0;position<info.frames;position+=written) {
@@ -114,11 +118,39 @@ int ts_modem_render(const ts_packet *packet, ts_pcm *out, volatile sig_atomic_t 
             memcmp(buffer,out->samples+position,written*sizeof(int16_t))) { snprintf(error,cap,"Canonical synth replay differs."); goto done; }
     }
     if (fms_player_hash(replay)!=out->hash || fms_player_clipped(replay)) { snprintf(error,cap,"Canonical synth hash differs."); goto done; }
+    if (canonical) { *canonical=record; *canonical_len=record_len-1; record=NULL; }
     ok=1;
 done:
-    fms_player_close(player); fms_player_close(replay); free(timeline); free(record);
+    fms_player_close(player); fms_player_close(replay); free(record);
     if (!ok) { ts_pcm_free(out); if (cancel && *cancel) snprintf(error,cap,"Cancelled."); else if (!error[0]) snprintf(error,cap,"Native packet rendering failed."); }
     return ok;
+}
+static int render_packet(const ts_packet *packet, ts_pcm *out, char **canonical, size_t *canonical_len,
+                         volatile sig_atomic_t *cancel, char *error, size_t cap) {
+    char *timeline=NULL; size_t len=0; int ok;
+    memset(out,0,sizeof(*out));
+    if (!ts_modem_timeline(packet->bytes,packet->len,0,&timeline,&len)) { snprintf(error,cap,"Cannot prepare the packet timeline."); return 0; }
+    ok=render_timeline(timeline,len,out,canonical,canonical_len,cancel,error,cap); free(timeline); return ok;
+}
+int ts_modem_render(const ts_packet *packet, ts_pcm *out, volatile sig_atomic_t *cancel, char *error, size_t cap) {
+    return render_packet(packet,out,NULL,NULL,cancel,error,cap);
+}
+int ts_modem_record(const ts_packet *packet, char **out, size_t *len, volatile sig_atomic_t *cancel, char *error, size_t cap) {
+    ts_pcm pcm={0}; int ok;
+    *out=NULL; *len=0; ok=render_packet(packet,&pcm,out,len,cancel,error,cap); ts_pcm_free(&pcm); return ok;
+}
+int ts_timeline_read(const char *name, ts_pcm *out, volatile sig_atomic_t *cancel, char *error, size_t cap) {
+    FILE *f=!strcmp(name,"-")?stdin:fopen(name,"rb"); char *text=NULL; size_t len=0; int ok=0;
+    memset(out,0,sizeof(*out));
+    if (!f) { snprintf(error,cap,"Cannot open timeline: %s",strerror(errno)); return 0; }
+    text=malloc(TS_TIMELINE_MAX+1u);
+    if (!text) { snprintf(error,cap,"Cannot allocate timeline input."); goto done; }
+    len=fread(text,1,TS_TIMELINE_MAX+1u,f);
+    if (ferror(f)) { snprintf(error,cap,"Timeline input could not be read completely."); goto done; }
+    ok=render_timeline(text,len,out,NULL,NULL,cancel,error,cap);
+done:
+    if (f!=stdin) fclose(f);
+    OPENSSL_clear_free(text,TS_TIMELINE_MAX+1u); return ok;
 }
 static int16_t rounded(double value) {
     if (value>32767) return 32767;
@@ -146,7 +178,7 @@ static void put32(uint8_t *p, uint32_t n) { put16(p,n&65535); put16(p+2,n>>16); 
 int ts_wav_read(const char *name, ts_pcm *out, char *error, size_t cap) {
     FILE *f=NULL; uint8_t *file=NULL; size_t len,offset,data=0,size=0,i,frames;
     unsigned encoding=0,channels=0,rate=0,align=0,bits=0; int format=0,have_data=0,ok=0;
-    memset(out,0,sizeof(*out)); f=fopen(name,"rb"); if (!f) goto done;
+    memset(out,0,sizeof(*out)); f=!strcmp(name,"-")?stdin:fopen(name,"rb"); if (!f) goto done;
     file=malloc(4*1024*1024+1); if (!file) goto done;
     len=fread(file,1,4*1024*1024+1,f);
     if (ferror(f) || len<44 || len>4*1024*1024 || memcmp(file,"RIFF",4) || memcmp(file+8,"WAVE",4) || (uint64_t)le32(file+4)+8!=len) goto done;
@@ -169,7 +201,7 @@ int ts_wav_read(const char *name, ts_pcm *out, char *error, size_t cap) {
     for (i=0;i<frames;++i) { unsigned n=le16(file+data+i*align); out->samples[i]=(int16_t)(n>=32768?(int)n-65536:(int)n); }
     ok=1;
 done:
-    if (f) fclose(f);
+    if (f && f!=stdin) fclose(f);
     if (file) OPENSSL_clear_free(file,4*1024*1024+1);
     if (!ok) { ts_pcm_free(out); snprintf(error,cap,"Use a complete mono/stereo PCM16 WAV, 44.1/48 kHz, at most 20 seconds and 4 MiB."); }
     return ok;

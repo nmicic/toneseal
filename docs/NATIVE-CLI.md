@@ -78,6 +78,8 @@ not identity. There is no automatic profile fallback.
 | `chat --send` / `chat` | Initiate / receive a persistent bidirectional chat. |
 | `devices --json` | List PortAudio IDs and defaults; no capture. |
 | `audio-probe --duration 2` | Report capture levels briefly; no recording. |
+| `text to-tl` / `text from-tl` | ToneSeal text to/from a standard JotTune sound timeline. |
+| `text to-wav` / `text from-wav` | ToneSeal text to/from a sound WAV. |
 | `encode` / `decode` | WAV diagnostics, described below. |
 | `capabilities` | Machine-readable commands, events, modes and limits. |
 
@@ -171,7 +173,59 @@ an initial line and then commands/chat lines from stdin. Automation must perform
 its own trusted fingerprint comparison before writing `/confirm`; displaying
 fingerprints does not authenticate automatically.
 
-## WAV diagnostics
+## ToneSeal text conversions
+
+`toneseal text` is a dedicated text-over-sound command group. It encodes ToneSeal
+text packets into standard JotTune Synth timelines or WAVs, and recovers their
+text through the audio decoder. General synth/music conversion belongs to the
+synth's own tools; arbitrary music is not interpreted as text.
+
+For a UTF-8 `message.txt` containing **1–96 bytes**, including any original spaces,
+newlines, BOM or NUL bytes:
+
+```sh
+build/toneseal text to-tl --input message.txt --output message.tl
+build/toneseal text from-tl --input message.tl --output roundtrip-tl.txt
+cmp message.txt roundtrip-tl.txt
+
+build/toneseal text to-wav --input message.txt --output message.wav
+build/toneseal text from-wav --input message.wav --output roundtrip-wav.txt
+cmp message.txt roundtrip-wav.txt
+```
+
+Both comparisons must be byte-identical. Files/pipes are neither trimmed nor
+normalized, and no output newline is added. Existing output files are refused;
+new files have mode 0600. TTY text is escaped for display; use a file, pipe or
+explicit `--output` for raw bytes.
+
+`to-tl` defaults to stdin/stdout and exports a complete canonical TL with its
+saved waveform hash. `from-tl` imports with the synth's production reader,
+renders and verifies that waveform and its canonical replay, then decodes the
+sound. Text is not recovered from comments or hidden plaintext. Draft TL without
+a saved hash is also accepted and checked by canonical replay. Engine identity
+must match the installed synth; TL input is bounded to 200,000 UTF-8 bytes,
+mono 48 kHz and six seconds. Truncated, malformed and hash-mismatched records
+fail without creating a decoded output file.
+
+```sh
+printf '%s' 'A dummy message' | build/toneseal text to-tl > example.tl
+build/toneseal text from-tl --input example.tl
+cat example.tl | build/toneseal text from-tl --input -
+build/toneseal text --help
+```
+
+WAV encoding requires a new `--output FILE`. `--rate 44100|48000` and
+`--profile nearby|telephone` apply to WAVs; use the matching profile for decoding.
+TL always retains the canonical 48 kHz timeline. Both inverse commands accept
+`--input -` for stdin and default to stdout. `--json` exposes metadata/events;
+`to-tl --json` requires a separate output file to keep its stdout valid JSON.
+`capabilities` lists all four actions under `textConversions`.
+
+These file conversions carry **cleartext** and imply no pairing or delivery
+receipt. Transfer IDs are freshly randomized, so two encodings of the same
+text can have different TL/WAV bytes while recovering identical text.
+
+## WAV diagnostics and compatibility
 
 ```sh
 printf '%s' 'A dummy cleartext message' | build/toneseal encode --output example.wav
@@ -180,7 +234,8 @@ build/toneseal decode --input example.wav --json
 build/toneseal decode --input recording.wav --packets
 ```
 
-Encoding writes unencrypted DATA, without pairing or a delivery receipt.
+`encode` and `decode` remain compatible aliases of `text to-wav` and
+`text from-wav`. Encoding writes unencrypted DATA, without pairing or a delivery receipt.
 Decoding accepts complete PCM16 mono/stereo WAV at 44.1/48 kHz, up to 20 seconds
 and 4 MiB, using the first channel. Add matching `--profile telephone` for that
 waveform. Encoding supports `--rate 44100|48000`. Opaque encrypted packets can
@@ -199,7 +254,8 @@ JOTTUNE_SYNTH_ROOT=../jottune-synth npm run test:cli -- --sanitize
 Checks cover OpenSSL/Web Crypto in both roles/profiles, production controllers
 on a shared modeled audio timeline, counter/replay-window limits, lost frames,
 receipts and close final, simultaneous senders, queue bounds, exact UTF-8,
-deterministic replay, WAV parsing, noisy/stereo capture and real terminal IO.
+deterministic replay, byte-exact text/TL/WAV round trips, saved-hash rejection,
+WAV parsing, noisy/stereo capture and real terminal IO.
 No physical microphone is opened. On Linux, `TONESEAL_TEST_ALSA_NULL=1` additionally
 exercises real PortAudio callback capture/playback, timeout and cancellation
 using a process-local ALSA null device. It changes no machine audio configuration

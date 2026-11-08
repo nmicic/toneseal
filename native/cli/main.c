@@ -17,9 +17,10 @@
 
 static volatile sig_atomic_t stop_signal;
 static void stopped(int signal_number) { stop_signal=signal_number; }
+enum { FILE_NONE, FILE_TO_WAV, FILE_FROM_WAV, FILE_TO_TL, FILE_FROM_TL };
 typedef struct {
     const char *command,*input,*output; int json,single,send,profile,crypto,verify,mode,input_device,output_device,packets,control_stdin;
-    unsigned timeout,rate,duration;
+    unsigned timeout,rate,duration; int file;
 } options;
 typedef struct {
     options options; ts_transfer *transfer;
@@ -62,6 +63,7 @@ static void help(void) {
          "  send          Send one item, obtain its receipt, then close\n"
          "  receive       Receive one item; repair its receipt/close\n"
          "  chat          Bidirectional Message chat; add --send to initiate\n"
+         "  text          ToneSeal text conversions: to-tl/from-tl/to-wav/from-wav\n"
          "  encode        Encode cleartext DATA into a verified synth WAV\n"
          "  decode        Decode a cleartext WAV, or inspect opaque packets\n"
          "  devices       List PortAudio input/output device IDs\n"
@@ -96,6 +98,23 @@ static void help(void) {
          "Simple mode encrypts but does not authenticate the initial peer.\n"
          "--verify requires an independent trusted fingerprint comparison on both sides.");
 }
+static void text_help(void) {
+    puts("Usage: toneseal text ACTION [options]\n"
+         "  to-tl     Encode UTF-8 text as a canonical ToneSeal sound timeline\n"
+         "  from-tl   Render a ToneSeal timeline and recover its text from sound\n"
+         "  to-wav    Encode UTF-8 text as a ToneSeal sound WAV\n"
+         "  from-wav  Recover ToneSeal text from a WAV recording\n"
+         "\n--input FILE|-    Text defaults to stdin; from-tl/from-wav need --input.\n"
+         "--output FILE|-   New 0600 output file; to-wav requires a file.\n"
+         "                  TL/text default to stdout; redirected text is byte-exact.\n"
+         "--json            Metadata/events; to-tl needs an output file in JSON mode.\n"
+         "--profile nearby|telephone --rate 44100|48000  WAV encoding options.\n"
+         "Match --profile when decoding a WAV. TL is always canonical mono 48 kHz.\n"
+         "\nThese are ToneSeal text-over-sound conversions, 1-96 UTF-8 bytes.\n"
+         "They do not interpret arbitrary synth music as text or provide encryption.\n"
+         "Files/pipes preserve spaces, newlines and NUL bytes; nothing is trimmed.\n"
+         "TTY text is escaped for display; use --output for an exact raw export.");
+}
 static int number(const char *arg, unsigned min, unsigned max, unsigned *out) {
     char *end; unsigned long n;
     errno=0; n=strtoul(arg,&end,10);
@@ -115,8 +134,18 @@ static int parse(int argc, char **argv, options *o) {
     if (argc<2 || !strcmp(argv[1],"--help") || !strcmp(argv[1],"help")) { help(); return -1; }
     if (!strcmp(argv[1],"--version")) { puts("ToneSeal 0.1.0 experimental beta"); return -1; }
     o->command=argv[1]; optind=2;
-    if (strcmp(o->command,"send") && strcmp(o->command,"receive") && strcmp(o->command,"chat") && strcmp(o->command,"encode") && strcmp(o->command,"decode") && strcmp(o->command,"devices") && strcmp(o->command,"audio-probe") && strcmp(o->command,"capabilities")) return 0;
-    if (!strcmp(o->command,"encode") || !strcmp(o->command,"decode")) o->mode=TS_MODE_CLEAR;
+    if (!strcmp(o->command,"text")) {
+        if (argc<3 || !strcmp(argv[2],"--help") || !strcmp(argv[2],"help")) { text_help(); return -1; }
+        if (!strcmp(argv[2],"to-tl")) o->file=FILE_TO_TL;
+        else if (!strcmp(argv[2],"from-tl")) o->file=FILE_FROM_TL;
+        else if (!strcmp(argv[2],"to-wav")) o->file=FILE_TO_WAV;
+        else if (!strcmp(argv[2],"from-wav")) o->file=FILE_FROM_WAV;
+        else return 0;
+        optind=3;
+    } else if (!strcmp(o->command,"encode")) o->file=FILE_TO_WAV;
+    else if (!strcmp(o->command,"decode")) o->file=FILE_FROM_WAV;
+    if (!o->file && strcmp(o->command,"send") && strcmp(o->command,"receive") && strcmp(o->command,"chat") && strcmp(o->command,"devices") && strcmp(o->command,"audio-probe") && strcmp(o->command,"capabilities")) return 0;
+    if (o->file) o->mode=TS_MODE_CLEAR;
     while ((flag=getopt_long(argc,argv,"h",flags,NULL))!=-1) {
         if (flag>=MODE && flag<=CONTROL) seen|=UINT32_C(1)<<(flag-MODE);
         switch (flag) {
@@ -141,23 +170,26 @@ static int parse(int argc, char **argv, options *o) {
         case PACKETS: o->packets=1; break;
         case SEND: o->send=1; break;
         case CONTROL: o->control_stdin=1; break;
-        case 'h': help(); return -1;
+        case 'h': if (!strcmp(o->command,"text")) text_help(); else help(); return -1;
         case VERSION: puts("ToneSeal 0.1.0 experimental beta"); return -1;
         default: return 0;
         }
     }
     #define BIT(name) (UINT32_C(1)<<((name)-MODE))
-    if (!strcmp(o->command,"encode")) allowed=BIT(MODE)|BIT(INPUT)|BIT(OUTPUT)|BIT(PROFILE)|BIT(RATE)|BIT(JSON);
-    else if (!strcmp(o->command,"decode")) allowed=BIT(MODE)|BIT(INPUT)|BIT(OUTPUT)|BIT(PROFILE)|BIT(JSON)|BIT(PACKETS);
+    if (o->file==FILE_TO_WAV) allowed=BIT(MODE)|BIT(INPUT)|BIT(OUTPUT)|BIT(PROFILE)|BIT(RATE)|BIT(JSON);
+    else if (o->file==FILE_FROM_WAV) allowed=BIT(MODE)|BIT(INPUT)|BIT(OUTPUT)|BIT(PROFILE)|BIT(JSON)|BIT(PACKETS);
+    else if (o->file==FILE_TO_TL || o->file==FILE_FROM_TL) allowed=BIT(MODE)|BIT(INPUT)|BIT(OUTPUT)|BIT(JSON);
     else if (!strcmp(o->command,"devices") || !strcmp(o->command,"capabilities")) allowed=BIT(JSON);
     else if (!strcmp(o->command,"audio-probe")) allowed=BIT(INPUT_DEVICE)|BIT(OUTPUT_DEVICE)|BIT(DURATION)|BIT(JSON);
     else allowed=BIT(MODE)|BIT(PROFILE)|BIT(CRYPTO)|BIT(VERIFY)|BIT(SINGLE)|BIT(INPUT)|BIT(OUTPUT)|BIT(INPUT_DEVICE)|BIT(OUTPUT_DEVICE)|BIT(TIMEOUT)|BIT(JSON)|BIT(SEND)|BIT(CONTROL);
     if (seen&~allowed) return 0;
     #undef BIT
     if (optind!=argc || (o->json && o->output && !strcmp(o->output,"-")) || (!strcmp(o->command,"chat") && (o->mode!=TS_MODE_MESSAGE || o->single)) ||
-        (!strcmp(o->command,"encode") && (o->mode!=TS_MODE_CLEAR || !o->output || !strcmp(o->output,"-"))) ||
-        (!strcmp(o->command,"decode") && (!o->input || o->mode!=TS_MODE_CLEAR)) ||
-        (o->send && strcmp(o->command,"chat")) || (o->packets && strcmp(o->command,"decode")) ||
+        (o->file && o->mode!=TS_MODE_CLEAR) ||
+        (o->file==FILE_TO_WAV && (!o->output || !strcmp(o->output,"-"))) ||
+        ((o->file==FILE_FROM_WAV || o->file==FILE_FROM_TL) && !o->input) ||
+        (o->file==FILE_TO_TL && o->json && !o->output) ||
+        (o->send && strcmp(o->command,"chat")) || (o->packets && o->file!=FILE_FROM_WAV) ||
         (o->verify && o->mode==TS_MODE_CLEAR) || (!strcmp(o->command,"receive") && o->input) ||
         (!strcmp(o->command,"chat") && !o->send && o->input) ||
         (o->single && o->mode!=TS_MODE_MESSAGE) ||
@@ -235,13 +267,27 @@ static int decoded(void *data, const ac_event *event) {
     if (ctx->packet_count==8) return 1;
     p=&ctx->packets[(ctx->packet_head+ctx->packet_count++)%8]; p->len=event->payload_bytes; memcpy(p->bytes,event->payload,p->len); return 0;
 }
+static int timeline_output(options *o, const ts_packet *packet, char *error, size_t cap) {
+    context ctx={0}; char *timeline=NULL; size_t len=0; int ok=0;
+    if (!ts_modem_record(packet,&timeline,&len,&stop_signal,error,cap)) return 0;
+    ctx.options=*o; if (!ctx.options.output) ctx.options.output="-";
+    if (output_open(&ctx) && write_bytes(ctx.output_fd,(const uint8_t *)timeline,len) &&
+        (!ctx.output_created || fsync(ctx.output_fd)==0)) { ctx.output_written=1; ok=1; }
+    if (ctx.output_created) { if (close(ctx.output_fd)) ok=0; if (!ok) unlink(o->output); }
+    if (!ok) snprintf(error,cap,"Timeline output could not be written to its new file/stdout.");
+    else if (o->json) printf("{\"schemaVersion\":1,\"type\":\"encoded\",\"format\":\"tl\",\"encrypted\":false,\"timelineBytes\":%zu,\"rate\":48000}\n",len);
+    else fputs("ToneSeal cleartext TL written; no pairing or receipt is implied.\n",stderr);
+    OPENSSL_clear_free(timeline,len+1); return ok;
+}
 static int file_command(options *o) {
     uint8_t text[97]; size_t len; char error[512]={0}; ts_packet p; ts_pcm pcm={0},physical={0}; int result=2;
-    if (!strcmp(o->command,"encode")) {
+    if (o->file==FILE_TO_WAV || o->file==FILE_TO_TL) {
         if (!read_input(o,text,&len,0)) return stop_signal?128+stop_signal:2;
-        if (ts_clear_data(text,len,&p) && ts_modem_render(&p,&pcm,&stop_signal,error,sizeof(error)) &&
+        if (!ts_clear_data(text,len,&p)) snprintf(error,sizeof(error),"Cannot prepare the ToneSeal cleartext packet.");
+        else if (o->file==FILE_TO_TL) { if (timeline_output(o,&p,error,sizeof(error))) result=0; }
+        else if (ts_modem_render(&p,&pcm,&stop_signal,error,sizeof(error)) &&
             ts_pcm_profile(&pcm,o->rate,o->profile,&physical) && ts_wav_write(o->output,&physical,error,sizeof(error))) {
-            if (o->json) printf("{\"schemaVersion\":1,\"type\":\"encoded\",\"encrypted\":false,\"frames\":%zu,\"rate\":%u}\n",physical.frames,physical.rate);
+            if (o->json) printf("{\"schemaVersion\":1,\"type\":\"encoded\",\"format\":\"wav\",\"encrypted\":false,\"frames\":%zu,\"rate\":%u}\n",physical.frames,physical.rate);
             else fprintf(stderr,"Cleartext WAV written; no pairing or receipt is implied.\n");
             result=0;
         }
@@ -250,11 +296,12 @@ static int file_command(options *o) {
         ac_receiver *receiver=malloc(sizeof(*receiver)); ts_resampler resampler; context ctx={0}; size_t i; int status=0;
         if (!receiver) return 2;
         ctx.options=*o;
-        if (!ts_wav_read(o->input,&pcm,error,sizeof(error))) goto decode_done;
+        if (o->file==FILE_FROM_TL) { if (!ts_timeline_read(o->input,&pcm,&stop_signal,error,sizeof(error))) goto decode_done; }
+        else if (!ts_wav_read(o->input,&pcm,error,sizeof(error))) goto decode_done;
         ac_init(receiver,decoded,&ctx); ts_resampler_init(&resampler,pcm.rate,o->profile);
         for (i=0;i<pcm.frames && !status;i+=997) { size_t n=pcm.frames-i; if (n>997) n=997; status=ts_resampler_feed(&resampler,receiver,pcm.samples+i,n); }
         if (!status) status=ts_resampler_finish(&resampler,receiver);
-        if (status) { snprintf(error,sizeof(error),"Recording could not be decoded within its bounds."); goto decode_done; }
+        if (status) { snprintf(error,sizeof(error),"ToneSeal sound could not be decoded within its bounds."); goto decode_done; }
         if (!ctx.packet_count) { result=1; snprintf(error,sizeof(error),"No packet was found."); goto decode_done; }
         if (!output_open(&ctx)) goto decode_done;
         result=1;
@@ -272,7 +319,7 @@ static int file_command(options *o) {
 decode_done:
         free(receiver); ts_pcm_free(&pcm); OPENSSL_cleanse(&ctx,sizeof(ctx)); OPENSSL_cleanse(text,sizeof(text));
     }
-    if (result && error[0]) fprintf(stderr,"%s\n",error);
+    if (result && error[0]) { terminal(stderr,(const uint8_t *)error,strlen(error)); fputc('\n',stderr); }
     if (fflush(stdout)==EOF || ferror(stdout)) result=2;
     return stop_signal?128+stop_signal:result;
 }
@@ -406,11 +453,16 @@ int main(int argc, char **argv) {
     if (parsed<0) return 0;
     if (!parsed) { fputs("Invalid command/options; use toneseal --help.\n",stderr); return 2; }
     if (!strcmp(o.command,"capabilities")) {
-        puts("{\"schemaVersion\":1,\"type\":\"capabilities\",\"version\":\"0.1.0\",\"experimental\":true,\"commands\":[\"send\",\"receive\",\"chat\",\"encode\",\"decode\",\"devices\",\"audio-probe\",\"capabilities\"],\"modes\":[\"message\",\"password\",\"clear\"],\"profiles\":[\"nearby\",\"telephone\"],\"crypto\":[\"p256\",\"x25519\"],\"maxTextBytes\":96,\"maxPending\":8,\"peerIdleSeconds\":{\"default\":60,\"min\":1,\"max\":120},\"localCommands\":[\"/confirm\",\"/quit\",\"/stop\",\"/reveal\",\"/send TEXT\"],\"events\":[\"status\",\"message\",\"password\",\"delivered\",\"encoded\",\"packet\",\"audio-level\"],\"passwordMasked\":true,\"automaticClipboard\":false,\"automaticPeerAuthentication\":false}");
+        puts("{\"schemaVersion\":1,\"type\":\"capabilities\",\"version\":\"0.1.0\",\"experimental\":true,"
+             "\"commands\":[\"send\",\"receive\",\"chat\",\"text\",\"encode\",\"decode\",\"devices\",\"audio-probe\",\"capabilities\"],"
+             "\"textConversions\":{\"actions\":[\"to-tl\",\"from-tl\",\"to-wav\",\"from-wav\"],\"encoding\":\"toneseal-text-over-sound\",\"maxTextBytes\":96,\"timelineMaxBytes\":200000,\"timelineRate\":48000},"
+             "\"modes\":[\"message\",\"password\",\"clear\"],\"profiles\":[\"nearby\",\"telephone\"],\"crypto\":[\"p256\",\"x25519\"],\"maxTextBytes\":96,\"maxPending\":8,"
+             "\"peerIdleSeconds\":{\"default\":60,\"min\":1,\"max\":120},\"localCommands\":[\"/confirm\",\"/quit\",\"/stop\",\"/reveal\",\"/send TEXT\"],"
+             "\"events\":[\"status\",\"message\",\"password\",\"delivered\",\"encoded\",\"packet\",\"audio-level\"],\"passwordMasked\":true,\"automaticClipboard\":false,\"automaticPeerAuthentication\":false}");
         return fflush(stdout)==EOF || ferror(stdout)?2:0;
     }
     if (!strcmp(o.command,"devices")) return ts_audio_devices(stdout,o.json)?0:2;
-    if (!strcmp(o.command,"encode") || !strcmp(o.command,"decode")) return file_command(&o);
+    if (o.file) return file_command(&o);
     if (!strcmp(o.command,"audio-probe")) return probe(&o);
     return live(&o);
 }

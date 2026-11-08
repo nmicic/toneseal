@@ -48,7 +48,11 @@ completions are coordinated before advancing virtual time. Scenarios include
 both roles, all three modes, chat, delayed starts, selective loss, duplicates,
 queue limits, simultaneous senders and confirmed/unconfirmed close. Fixed
 framing fixtures, counter exhaustion, replay-window edges, malformed WAVs,
-noisy/stereo PCM and real terminal IO have separate checks. Counter inspection
+noisy/stereo PCM and real terminal IO have separate checks. Text/TL and text/WAV
+round trips compare actual recovered bytes, including BOMs, combining Unicode,
+CRLF, NULs and the 96-byte limit. TL recovery uses the production synth reader,
+rendering and audio decoder; altered hashes and unrelated music release no text.
+Counter inspection
 is confined to a test executable, with no production counter/nonce overrides.
 
 On Linux, `TONESEAL_TEST_ALSA_NULL=1` opts into real PortAudio callback/lifecycle

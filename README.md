@@ -109,7 +109,8 @@ build/toneseal receive --verify
 
 Run send and receive on different devices. See [native build, flow and automation
 instructions](docs/NATIVE-CLI.md) for required system packages, matching browser
-settings, chat, WAV diagnostics, JSON events and the test scope. Physical
+settings, chat, byte-exact `toneseal text to-tl/from-tl/to-wav/from-wav`
+conversions, JSON events and the test scope. Physical
 CLI-to-phone/browser testing and native mobile apps remain pending. The retained
 [JavaScript file CLI](LEGACY.md) is a separate cleartext diagnostic.
 
