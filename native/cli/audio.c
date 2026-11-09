@@ -19,7 +19,7 @@ struct ts_audio {
     atomic_uint_fast64_t written,read,dropped,overflows,underflows;
     atomic_size_t transmit_at;
     atomic_int transmitting;
-    unsigned rate; int telephone,output_channels;
+    unsigned rate; int audio_profile,output_channels;
     double output_latency,input_peak;
     uint64_t clipped;
     struct { ts_packet packet; ts_pcm pcm; } cache[4]; size_t cache_next;
@@ -85,8 +85,9 @@ int ts_audio_devices(FILE *out, int json) {
     if (!json && count==0) fputs("No audio devices are available.\n",out);
     Pa_Terminate(); return count>=0 && !ferror(out);
 }
-ts_audio *ts_audio_open(int input, int output, int telephone, char *error, size_t cap) {
+ts_audio *ts_audio_open(int input, int output, int profile, char *error, size_t cap) {
     ts_audio *a=NULL; PaStreamParameters in={0},out={0}; const PaDeviceInfo *in_info,*out_info; PaError result;
+    if (!ts_audio_profile_valid(profile)) { snprintf(error,cap,"Choose a supported audio profile."); return NULL; }
     result=Pa_Initialize(); if (result!=paNoError) { snprintf(error,cap,"Cannot initialize audio: %s",Pa_GetErrorText(result)); return NULL; }
     if (input<0) input=Pa_GetDefaultInputDevice();
     if (output<0) output=Pa_GetDefaultOutputDevice();
@@ -100,7 +101,7 @@ ts_audio *ts_audio_open(int input, int output, int telephone, char *error, size_
         snprintf(error,cap,"This audio backend requires lock-free native atomics."); goto failed;
     }
     a->ring=calloc(RING_SIZE,sizeof(float)); if (!a->ring) goto failed;
-    a->telephone=telephone;
+    a->audio_profile=profile;
     in.device=input; in.channelCount=1; in.sampleFormat=paFloat32; in.suggestedLatency=in_info->defaultLowInputLatency;
     out.device=output; out.channelCount=out_info->maxOutputChannels>=2?2:1; out.sampleFormat=paFloat32; out.suggestedLatency=out_info->defaultLowOutputLatency;
     a->rate=48000;
@@ -151,10 +152,10 @@ int ts_audio_send(ts_audio *a, const ts_packet *packet, volatile sig_atomic_t *c
     if (!pcm) {
         size_t slot=a->cache_next++%4;
         ts_pcm_free(&a->cache[slot].pcm);
-        if (!ts_modem_render(packet,&a->cache[slot].pcm,cancel,error,cap)) return 0;
+        if (!ts_modem_render_profile(packet,a->audio_profile,&a->cache[slot].pcm,cancel,error,cap)) return 0;
         a->cache[slot].packet=*packet; pcm=&a->cache[slot].pcm;
     }
-    if (!ts_pcm_profile(pcm,a->rate,a->telephone,&physical)) { snprintf(error,cap,"Cannot prepare playback sample rate."); return 0; }
+    if (!ts_pcm_profile(pcm,a->rate,a->audio_profile,&physical)) { snprintf(error,cap,"Cannot prepare playback sample rate."); return 0; }
     a->transmit=malloc(physical.frames*sizeof(float));
     if (!a->transmit) { ts_pcm_free(&physical); snprintf(error,cap,"Cannot allocate playback buffer."); return 0; }
     for (i=0;i<physical.frames;++i) a->transmit[i]=physical.samples[i]/32768.0f;

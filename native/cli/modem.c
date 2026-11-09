@@ -1,6 +1,7 @@
 /* Copyright (c) 2026 Nenad Micic; SPDX-License-Identifier: Apache-2.0 */
 #include "modem.h"
 #include "jottune_bridge.h"
+#include "ultrasonic_tables.h"
 #include <openssl/crypto.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -61,27 +62,31 @@ static int append(char *out, size_t cap, size_t *used, const char *format, ...) 
     if (n<0 || (size_t)n>=cap-*used) return 0;
     *used+=(size_t)n; return 1;
 }
-int ts_modem_timeline(const uint8_t *payload, size_t n, uint16_t sender, char **out, size_t *len) {
+int ts_modem_timeline_profile(const uint8_t *payload, size_t n, uint16_t sender, int profile, char **out, size_t *len) {
     static const uint8_t preamble[8]={0,255,85,170,51,204,105,150};
     uint8_t glyphs[204]; char engine[160],*text; size_t count,used=0,i; unsigned voice;
-    const size_t cap=160000;
-    if (n>128) return 0;
+    const size_t cap=160000; unsigned scale=profile==TS_AUDIO_ULTRASONIC?2:1;
+    if (n>128 || !ts_audio_profile_valid(profile)) return 0;
     memcpy(glyphs,preamble,8); count=ts_modem_frame(payload,n,sender,glyphs+8)+8;
     fms_engine_line(engine,sizeof(engine));
     text=malloc(cap); if (!text) return 0;
     if (!append(text,cap,&used,"timeline draft1\nengine %s\nfs 48000\nlength_ns %llu\nstreams message\npatch sine 0 65536 300 0 0 0 1 1 0 1\npatch sine 1 65536 0 0 0 0 1 1 0 1\n",
-                engine,(unsigned long long)(80+count*20)*1000000)) goto failed;
+                engine,(unsigned long long)(80+count*20)*1000000*scale)) goto failed;
     for (voice=0;voice<4;++voice) if (!append(text,cap,&used,"voice %u sine\n",voice)) goto failed;
     for (i=0;i<count;++i) {
-        unsigned long long start=(40+(unsigned long long)i*20)*1000000;
+        unsigned long long start=(40+(unsigned long long)i*20)*1000000*scale;
         for (voice=0;voice<4;++voice) {
-            unsigned frequency=600+50*(voice*16+((glyphs[i]>>4)^mul(glyphs[i]&15,voice)));
-            if (!append(text,cap,&used,"%llu message %u on %u 32767\n%llu message %u off\n",start,voice,frequency*1000,start+18000000,voice)) goto failed;
+            unsigned tone=voice*16+((glyphs[i]>>4)^mul(glyphs[i]&15,voice));
+            unsigned frequency=profile==TS_AUDIO_ULTRASONIC?18400+25*tone:600+50*tone;
+            if (!append(text,cap,&used,"%llu message %u on %u 32767\n%llu message %u off\n",start,voice,frequency*1000,start+18000000*scale,voice)) goto failed;
         }
     }
     *out=text; *len=used; return 1;
 failed:
     free(text); return 0;
+}
+int ts_modem_timeline(const uint8_t *payload, size_t n, uint16_t sender, char **out, size_t *len) {
+    return ts_modem_timeline_profile(payload,n,sender,TS_AUDIO_NEARBY,out,len);
 }
 void ts_pcm_free(ts_pcm *p) {
     if (p->samples) OPENSSL_clear_free(p->samples,p->frames*sizeof(int16_t));
@@ -99,7 +104,7 @@ static int render_timeline(const char *timeline, size_t len, ts_pcm *out, char *
     if (cancel && *cancel) goto done;
     if (fms_player_import(timeline,len,NULL,&player,error,cap)!=FMS_OK) goto done;
     fms_player_info(player,&info);
-    if (info.fs!=48000 || info.channels!=1 || !info.frames || info.frames>48000*6u) { snprintf(error,cap,"Use a mono 48 kHz ToneSeal timeline of at most six seconds."); goto done; }
+    if (info.fs!=48000 || info.channels!=1 || !info.frames || info.frames>48000*12u) { snprintf(error,cap,"Use a mono 48 kHz ToneSeal timeline of at most twelve seconds."); goto done; }
     out->frames=info.frames; out->rate=info.fs; out->samples=malloc(out->frames*sizeof(int16_t));
     if (!out->samples) goto done;
     while (position<info.frames) {
@@ -125,19 +130,25 @@ done:
     if (!ok) { ts_pcm_free(out); if (cancel && *cancel) snprintf(error,cap,"Cancelled."); else if (!error[0]) snprintf(error,cap,"Native packet rendering failed."); }
     return ok;
 }
-static int render_packet(const ts_packet *packet, ts_pcm *out, char **canonical, size_t *canonical_len,
+static int render_packet(const ts_packet *packet, int profile, ts_pcm *out, char **canonical, size_t *canonical_len,
                          volatile sig_atomic_t *cancel, char *error, size_t cap) {
     char *timeline=NULL; size_t len=0; int ok;
     memset(out,0,sizeof(*out));
-    if (!ts_modem_timeline(packet->bytes,packet->len,0,&timeline,&len)) { snprintf(error,cap,"Cannot prepare the packet timeline."); return 0; }
+    if (!ts_modem_timeline_profile(packet->bytes,packet->len,0,profile,&timeline,&len)) { snprintf(error,cap,"Cannot prepare the packet timeline/profile."); return 0; }
     ok=render_timeline(timeline,len,out,canonical,canonical_len,cancel,error,cap); free(timeline); return ok;
 }
 int ts_modem_render(const ts_packet *packet, ts_pcm *out, volatile sig_atomic_t *cancel, char *error, size_t cap) {
-    return render_packet(packet,out,NULL,NULL,cancel,error,cap);
+    return ts_modem_render_profile(packet,TS_AUDIO_NEARBY,out,cancel,error,cap);
+}
+int ts_modem_render_profile(const ts_packet *packet, int profile, ts_pcm *out, volatile sig_atomic_t *cancel, char *error, size_t cap) {
+    return render_packet(packet,profile,out,NULL,NULL,cancel,error,cap);
 }
 int ts_modem_record(const ts_packet *packet, char **out, size_t *len, volatile sig_atomic_t *cancel, char *error, size_t cap) {
+    return ts_modem_record_profile(packet,TS_AUDIO_NEARBY,out,len,cancel,error,cap);
+}
+int ts_modem_record_profile(const ts_packet *packet, int profile, char **out, size_t *len, volatile sig_atomic_t *cancel, char *error, size_t cap) {
     ts_pcm pcm={0}; int ok;
-    *out=NULL; *len=0; ok=render_packet(packet,&pcm,out,len,cancel,error,cap); ts_pcm_free(&pcm); return ok;
+    *out=NULL; *len=0; ok=render_packet(packet,profile,&pcm,out,len,cancel,error,cap); ts_pcm_free(&pcm); return ok;
 }
 int ts_timeline_read(const char *name, ts_pcm *out, volatile sig_atomic_t *cancel, char *error, size_t cap) {
     FILE *f=!strcmp(name,"-")?stdin:fopen(name,"rb"); char *text=NULL; size_t len=0; int ok=0;
@@ -157,10 +168,10 @@ static int16_t rounded(double value) {
     if (value< -32768) return -32768;
     return (int16_t)floor(value+0.5);
 }
-int ts_pcm_profile(const ts_pcm *source, unsigned rate, int telephone, ts_pcm *out) {
+int ts_pcm_profile(const ts_pcm *source, unsigned rate, int profile, ts_pcm *out) {
     size_t i; double scale;
-    if ((rate!=44100 && rate!=48000) || !source->frames || source->rate!=48000) return 0;
-    scale=48000.0*(telephone?0.75:1)/rate;
+    if ((rate!=44100 && rate!=48000) || !ts_audio_profile_valid(profile) || !source->frames || source->rate!=48000) return 0;
+    scale=48000.0*(profile==TS_AUDIO_TELEPHONE?0.75:1)/rate;
     memset(out,0,sizeof(*out)); out->rate=rate; out->frames=(size_t)ceil(source->frames/scale);
     out->samples=malloc(out->frames*sizeof(int16_t)); if (!out->samples) return 0;
     for (i=0;i<out->frames;++i) {
@@ -228,21 +239,35 @@ int ts_wav_write(const char *name, const ts_pcm *pcm, char *error, size_t cap) {
     if (!ok) { unlink(name); snprintf(error,cap,"WAV output failed."); }
     return ok;
 }
-int ts_resampler_init(ts_resampler *r, unsigned rate, int telephone) {
-    if (rate!=44100 && rate!=48000) return 0;
-    memset(r,0,sizeof(*r)); r->step=rate*(telephone?4:1); r->den=48000*(telephone?3:1); return 1;
+static int16_t clamp_sample(int64_t value) { return value>32767?32767:value< -32768?-32768:(int16_t)value; }
+static int64_t round_q30(int64_t value) { return value<0?-((-value+INT64_C(536870912))/INT64_C(1073741824)):(value+INT64_C(536870912))/INT64_C(1073741824); }
+static int16_t ultrasonic_sample(ts_resampler *r, int16_t value) {
+    const int32_t *mix=r->input_rate==48000?ts_ultrasonic_mix_48000:ts_ultrasonic_mix_44100;
+    const int32_t *filter=r->input_rate==48000?ts_ultrasonic_filter_48000:ts_ultrasonic_filter_44100;
+    unsigned j,at=r->filter_at,period=r->input_rate==48000?480:441; int64_t sum;
+    r->filter_history[at]=clamp_sample(round_q30((int64_t)value*mix[r->carrier_phase]));
+    sum=(int64_t)filter[48]*r->filter_history[(at-48)&127u];
+    for (j=0;j<48;++j) sum+=(int64_t)filter[j]*(r->filter_history[(at-j)&127u]+r->filter_history[(at-(96-j))&127u]);
+    r->filter_at=(at+1)&127u; if (++r->carrier_phase==period) r->carrier_phase=0;
+    return clamp_sample(round_q30(sum));
+}
+int ts_resampler_init(ts_resampler *r, unsigned rate, int profile) {
+    if ((rate!=44100 && rate!=48000) || !ts_audio_profile_valid(profile)) return 0;
+    memset(r,0,sizeof(*r)); r->audio_profile=profile; r->input_rate=rate;
+    r->step=rate*(profile==TS_AUDIO_TELEPHONE?4:1); r->den=profile==TS_AUDIO_ULTRASONIC?24000:48000*(profile==TS_AUDIO_TELEPHONE?3:1); return 1;
 }
 int ts_resampler_feed(ts_resampler *r, ac_receiver *receiver, const int16_t *input, size_t n) {
     size_t i;
     for (i=0;i<n;++i,++r->index) {
+        int16_t sample=r->audio_profile==TS_AUDIO_ULTRASONIC?ultrasonic_sample(r,input[i]):input[i];
         uint64_t now=r->index*r->den;
         while (r->next<=now) {
-            double value=input[i];
-            if (r->started) { double fraction=(double)(r->next-(r->index-1)*r->den)/r->den; value=r->previous*(1-fraction)+input[i]*fraction; }
+            double value=sample;
+            if (r->started) { double fraction=(double)(r->next-(r->index-1)*r->den)/r->den; value=r->previous*(1-fraction)+sample*fraction; }
             r->buffer[r->count++]=rounded(value); r->next+=r->step;
             if (r->count==1024) { int status=ac_feed(receiver,r->buffer,r->count); r->count=0; if (status) return status; }
         }
-        r->previous=input[i]; r->started=1;
+        r->previous=sample; r->started=1;
     }
     if (r->count) { int status=ac_feed(receiver,r->buffer,r->count); r->count=0; if (status) return status; }
     return 0;

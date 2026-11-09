@@ -15,6 +15,8 @@ const packet=Uint8Array.from({length:128},(_,i)=>(i*71)&255);
 const result=await runCLI(synth,['--play','record.tl','--merged','canonical.tl'],{'record.tl':payloadTimeline(packet,engine.identity)});
 assert.equal(result.code,0,result.stderr);
 const pcm=result.pcm;
+const ultrasonicResult=await runCLI(synth,['--play','record.tl','--merged','canonical.tl'],{'record.tl':payloadTimeline(packet,engine.identity,'ultrasonic')});
+assert.equal(ultrasonicResult.code,0,ultrasonicResult.stderr);
 assert.equal(getAudioProfile().id,'nearby');
 assert.equal(getAudioProfile('nearby').playbackRate,1);
 assert.equal(getAudioProfile('telephone').playbackRate,0.75);
@@ -30,11 +32,11 @@ function place(samples,source,start,rate,playbackRate){
   }
 }
 async function streamCase(rate,starts,duration,{profile='nearby',receiverProfile=profile,chunks=[2048]}={}){
-  const playbackRate=getAudioProfile(profile).playbackRate;
-  const decoder=await StreamingDecoder.create(module,rate,receiverProfile),samples=new Float32Array(Math.ceil(duration*rate/playbackRate));
-  // Fixture positions are canonical seconds, so slowed packets cross the same
-  // native reset boundaries at proportionally later physical capture times.
-  for(const start of starts)place(samples,pcm,start/playbackRate,rate,playbackRate);
+  const {playbackRate,timingScale}=getAudioProfile(profile),source=profile==='ultrasonic'?ultrasonicResult.pcm:pcm;
+  const decoder=await StreamingDecoder.create(module,rate,receiverProfile),samples=new Float32Array(Math.ceil(duration*rate*timingScale));
+  // Fixture positions use the decoder's canonical clock, so each physical
+  // profile crosses the same native reset boundaries at its own duration.
+  for(const start of starts)place(samples,source,start*timingScale,rate,playbackRate);
   const found=[];for(let i=0,chunk=0;i<samples.length;chunk++){
     const count=chunks[chunk%chunks.length],emitted=decoder.push(samples.slice(i,i+count));i+=count;
     // Match the decoder Worker's transferable delivery: output buffers become
@@ -53,23 +55,31 @@ await streamCase(48000,[0.21,10.9,17.8,29.4],35);
 await streamCase(44100,[0.17,10.7,17.9],24);
 await streamCase(48000,[0.21,10.9,17.8,29.4],35,{profile:'telephone',chunks:[1,17,2048,4096,8192]});
 await streamCase(44100,[0.17,10.7,17.9],24,{profile:'telephone',chunks:[8192,11,2048,3071]});
+await streamCase(48000,[0.21,10.9,17.8,29.4],35,{profile:'ultrasonic',chunks:[1,17,2048,4096,8192]});
+await streamCase(44100,[0.17,10.7,17.9],24,{profile:'ultrasonic',chunks:[8192,11,2048,3071]});
 await streamCase(48000,[0.21],6,{profile:'telephone',receiverProfile:'nearby'});
 await streamCase(44100,[0.17],6,{profile:'nearby',receiverProfile:'telephone'});
+await streamCase(48000,[0.21],6,{profile:'ultrasonic',receiverProfile:'nearby'});
+await streamCase(44100,[0.17],6,{profile:'nearby',receiverProfile:'ultrasonic'});
 // Seven short packets make both receivers reach the adapter result capacity
 // together. Their scheduled reset phases must remain staggered afterward.
 const shortPacket=Uint8Array.of(0xa7),shortResult=await runCLI(synth,['--play','record.tl','--merged','canonical.tl'],{'record.tl':payloadTimeline(shortPacket,engine.identity)});
 assert.equal(shortResult.code,0);
+const ultrasonicShort=await runCLI(synth,['--play','record.tl','--merged','canonical.tl'],{'record.tl':payloadTimeline(shortPacket,engine.identity,'ultrasonic')});
+assert.equal(ultrasonicShort.code,0,ultrasonicShort.stderr);
 async function burstCase(rate,profile='nearby'){
-  const playbackRate=getAudioProfile(profile).playbackRate;
-  const burst=new Float32Array(Math.ceil(28*rate/playbackRate)),burstDecoder=await StreamingDecoder.create(module,rate,profile),burstFound=[];
-  for(let i=0;i<7;i++)place(burst,shortResult.pcm,(6.05+i*0.8)/playbackRate,rate,playbackRate);
-  place(burst,pcm,11.8/playbackRate,rate,playbackRate);place(burst,pcm,23.2/playbackRate,rate,playbackRate);
+  const {playbackRate,timingScale}=getAudioProfile(profile),short=profile==='ultrasonic'?ultrasonicShort.pcm:shortResult.pcm,full=profile==='ultrasonic'?ultrasonicResult.pcm:pcm;
+  const burst=new Float32Array(Math.ceil(28*rate*timingScale)),burstDecoder=await StreamingDecoder.create(module,rate,profile),burstFound=[];
+  for(let i=0;i<7;i++)place(burst,short,(6.05+i*0.8)*timingScale,rate,playbackRate);
+  place(burst,full,11.8*timingScale,rate,playbackRate);place(burst,full,23.2*timingScale,rate,playbackRate);
   for(let i=0;i<burst.length;i+=2048)burstFound.push(...burstDecoder.push(burst.slice(i,i+2048)));
   assert.deepEqual(burstFound,[...Array.from({length:7},()=>shortPacket),packet,packet]);
 }
 await burstCase(48000);
 await burstCase(48000,'telephone');
 await burstCase(44100,'telephone');
+await burstCase(48000,'ultrasonic');
+await burstCase(44100,'ultrasonic');
 const decoder=await StreamingDecoder.create(module,48000);
 assert.throws(()=>decoder.push(Float32Array.of(NaN)),/Non-finite/);
 assert.throws(()=>decoder.push(new Float32Array(8193)),/Invalid/);
@@ -105,13 +115,13 @@ assert.equal(crcDecoder.metrics.crcRejectedCandidates,crcFailures,'playback rese
 const recovered=[];
 for(let offset=0;offset<pcm.length;offset+=2048)recovered.push(...crcDecoder.push(Float32Array.from(pcm.slice(offset,offset+2048),value=>value/32768)));
 assert.deepEqual(recovered,[packet],'a clean packet recovers after the failed checksum');
-console.log('PASS continuous native decoding: nearby/telephone at 48/44.1 kHz, full packets across both reset boundaries, irregular chunks, duplicate suppression, profile mismatch, silence and bounded input.');
+console.log('PASS continuous native decoding: nearby/telephone/near-ultrasonic at 48/44.1 kHz, full packets across both reset boundaries, irregular chunks, duplicate suppression, profile mismatch, silence and bounded input.');
 console.log('PASS native CRC telemetry: valid Reed–Solomon words with a wrong payload checksum are rejected, counted as candidate failures, and followed by exact recovery.');
 
 const {AutoAudioLink}=await import(new URL('auto-audio-link.mjs',dist));
 const saved=new Map(['navigator','AudioContext','AudioWorkletNode','Worker','fetch'].map(key=>[key,Object.getOwnPropertyDescriptor(globalThis,key)]));
 let contextCount=0,resumeCalls=0,stopped=0,closed=0,lastContext,lastNode,lastSource,lastGain,lastBuffer;
-let gum,decoderWorker,renderJobs=0,renderWorkers=0,holdInit=false,releaseInit,suppressDecoded=false;
+let gum,decoderWorker,renderJobs=0,renderWorkers=0,holdInit=false,releaseInit,suppressDecoded=false,renderPCM=pcm;
 const audioSession={type:'auto'};
 const tracks=[{readyState:'live',stop(){this.readyState='ended';stopped++;}}];
 const stream={getTracks:()=>tracks};
@@ -141,7 +151,7 @@ class Worker {
       if(data.type==='samples'&&!suppressDecoded)queueMicrotask(()=>!this.ended&&this.onmessage?.({data:{type:'decoded',id:data.id,epoch:data.epoch,packets:[]}}));
     }else{
       renderJobs++;
-      queueMicrotask(()=>!this.ended&&this.onmessage?.({data:{verdict:'valid',canonical:new TextEncoder().encode('canonical'),verified:true,channels:1,sampleRate:48000,play:{clipped:'0'},pcm}}));
+      queueMicrotask(()=>!this.ended&&this.onmessage?.({data:{verdict:'valid',canonical:new TextEncoder().encode('canonical'),verified:true,channels:1,sampleRate:48000,play:{clipped:'0'},pcm:renderPCM}}));
     }
   }
   terminate(){this.ended=true;}
@@ -235,6 +245,17 @@ try{
   const slowRepeat=telephone.send(packet);await eventLoop();
   telephone.stop();await assert.rejects(slowRepeat,{name:'AbortError'});
   assert.equal(telephone.running,false);assert.equal(telephone.cache.size,0);assert.equal(audioSession.type,'auto');
+  renderPCM=ultrasonicResult.pcm;
+  const ultrasonic=new AutoAudioLink({profile:'ultrasonic'});
+  await ultrasonic.start();
+  assert.equal(decoderWorker.messages.find(message=>message.type==='init').profile,'ultrasonic');
+  const high=ultrasonic.send(packet);await eventLoop();await eventLoop();
+  assert.equal(lastSource.rateAtStart,1,'near-ultrasonic plays its separate timeline without another slowdown');
+  assert.equal(lastBuffer.length,ultrasonicResult.pcm.length,'the full 8.32-second verified packet fits the render limit');
+  assert.ok(lastBuffer.every((sample,index)=>sample===ultrasonicResult.pcm[index]/32768));
+  lastContext.currentTime=lastBuffer.length/48000;lastSource.onended();await high;
+  assert.equal(ultrasonic.allowedAfter,lastContext.currentTime+0.35,'near-ultrasonic echo guard remains physical time');
+  ultrasonic.stop();assert.equal(audioSession.type,'auto');renderPCM=pcm;
   await link.start();const liveContext=lastContext;liveContext.state='interrupted';liveContext.onstatechange();
   assert.equal(link.metrics.rxFrames,0,'a new run resets diagnostics');
   assert.equal(link.running,false);assert.match(errors.at(-1),/interrupted/);assert.equal(liveContext.state,'closed');

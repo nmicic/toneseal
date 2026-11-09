@@ -76,6 +76,20 @@ try{
   assert.equal(restarted,measured.rows[0].hash);
   assert.equal(counts.get(wasm),wasmBefore+1,'Stop discards cached engine bytes before a new run');
   assert.equal(counts.get('/auto-render-worker.mjs'),workersBefore+1,'new run gets a fresh worker');
+  const ultrasonic=await page.evaluate(async()=>{
+    const {AutoAudioLink}=await import('./auto-audio-link.mjs');
+    const {StreamingDecoder}=await import('./auto-decoder.mjs');
+    const packet=window.renderCheck.packets[2],link=new AutoAudioLink({profile:'ultrasonic'});
+    try{
+      const pcm=await link.prepare(packet,link.generation);
+      const wasm=await WebAssembly.compile(await(await fetch('./communication-decoder.wasm')).arrayBuffer());
+      const receiver=await StreamingDecoder.create(wasm,48000,'ultrasonic'),samples=new Float32Array(pcm.length+14400),decoded=[];
+      samples.set(Float32Array.from(pcm,value=>value/32768));
+      for(let i=0;i<samples.length;i+=2048)decoded.push(...receiver.push(samples.slice(i,i+2048)));
+      return {audioMs:pcm.length/48,exact:decoded.length===1&&decoded[0].length===packet.length&&decoded[0].every((value,i)=>value===packet[i])};
+    }finally{link.stop();}
+  });
+  assert.equal(ultrasonic.audioMs,8320);assert.equal(ultrasonic.exact,true,'real browser Worker synth and receiver preserve the maximum ultrasonic packet');
   assert.deepEqual(errors,[]);
   console.log('PASS browser renderer: one engine fetch per run, original canonical verification and exact PCM preserved, cached identity/checksum rejection, Stop clears cache.');
   console.log(JSON.stringify({preparation:measured.rows.map(({hash,...row})=>row)}));

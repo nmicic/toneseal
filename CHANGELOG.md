@@ -21,6 +21,9 @@ Initial public-source release, prepared for publication.
   boundaries, terminal safety and Linux null-device audio lifecycle checks.
 - ToneSeal-specific `text to-tl/from-tl/to-wav/from-wav` commands, with canonical
   synth replay, saved waveform hash validation and byte-exact UTF-8 round trips.
+- Experimental Near-ultrasonic audio profile in the primary web interface and
+  C CLI, with matching 18.4–19.975 kHz synthesis, integer mixer/low-pass capture,
+  longer timing, live spectrum ranges and synthetic interoperability checks.
 - Independent framing fixtures, protocol/acoustic simulations, browser checks,
   mobile-layout checks and Linux/macOS continuous integration configuration.
 

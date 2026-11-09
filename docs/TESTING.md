@@ -63,6 +63,17 @@ the real synths and opposite receivers. These are synthetic sound tests, not
 physical speaker/microphone or telephone acceptance. See
 [native instructions](NATIVE-CLI.md).
 
+The experimental Near-ultrasonic profile is included in browser/C waveform
+comparisons at 44.1/48 kHz, full encrypted Password/chat PCM transfers and
+byte-exact text/TL/WAV round trips. Its mixer/filter constants are regenerated
+and checked on Linux/macOS, including integer bounds and suppression of
+out-of-band input before rate conversion. `node tests/auto-audio-link.mjs` checks
+long streams across decoder resets and irregular capture chunks for all three
+profiles. Shared-timeline loss cases verify recovery with a two-minute idle
+setting and bounded failure when the same burst exceeds the default minute.
+These checks do not establish high-frequency support on real phone hardware,
+inaudibility or reliable operation in a loud room.
+
 `tests/simulated-transfer.mjs` runs the actual automatic controller, session
 cryptography, and framing on one virtual clock. Device A and B share a half
 duplex medium. Frames have their real encoded durations; the model accounts for

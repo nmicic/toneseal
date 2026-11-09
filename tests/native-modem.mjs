@@ -12,10 +12,10 @@ if(!process.env.TONESEAL_MODEM)execFileSync('python3',['scripts/build-cli.py','-
 const run=(...args)=>execFileSync(driver,args,{encoding:'utf8',maxBuffer:1024*1024});
 const fixture=JSON.parse(await fs.readFile(new URL('./fixtures/codec-vectors.json',import.meta.url),'utf8'));
 test('native tone timelines match the browser encoder exactly',()=>{
-  for(const row of fixture.vectors){
-    const packet=Uint8Array.from(row.payload),timeline=run('timeline',Buffer.from(packet).toString('hex'));
+  for(const profile of ['nearby','ultrasonic'])for(const row of fixture.vectors){
+    const packet=Uint8Array.from(row.payload),timeline=run('timeline',Buffer.from(packet).toString('hex'),profile);
     const identity=timeline.split('\n')[1].slice(7);
-    assert.equal(timeline,payloadTimeline(packet,identity));
+    assert.equal(timeline,payloadTimeline(packet,identity,profile));
   }
 });
 
@@ -29,10 +29,11 @@ test('native and browser synth PCM agree; both receivers decode crosswise',{skip
     assert.equal(Buffer.from(await crypto.subtle.digest('SHA-256',wasm)).toString('hex'),engine.browser_sha256);
     const synth=await WebAssembly.compile(wasm),decoder=await WebAssembly.compile(await fs.readFile(new URL('communication-decoder.wasm',dist)));
     const packet=Uint8Array.from({length:128},(_,i)=>(i*37+9)&255),value=Buffer.from(packet).toString('hex');
-    const nativeTimeline=run('timeline',value);assert.equal(nativeTimeline,payloadTimeline(packet,engine.identity));
-    const rendered=await runCLI(synth,['--play','packet.tl','--merged','canonical.tl'],{'packet.tl':nativeTimeline});
-    assert.equal(rendered.code,0,rendered.stderr);
-    for(const profile of ['nearby','telephone'])for(const rate of [48000,44100]){
+    for(const profile of ['nearby','telephone','ultrasonic']){
+      const nativeTimeline=run('timeline',value,profile);assert.equal(nativeTimeline,payloadTimeline(packet,engine.identity,profile));
+      const rendered=await runCLI(synth,['--play','packet.tl','--merged','canonical.tl'],{'packet.tl':nativeTimeline});
+      assert.equal(rendered.code,0,rendered.stderr);
+      for(const rate of [48000,44100]){
       const name=path.join(directory,`${profile}-${rate}.wav`);
       run('render',value,name,String(rate),profile);
       const wav=await fs.readFile(name),capture=readCaptureWav(wav.buffer.slice(wav.byteOffset,wav.byteOffset+wav.byteLength));
@@ -48,6 +49,7 @@ test('native and browser synth PCM agree; both receivers decode crosswise',{skip
       const browserWav=path.join(directory,`browser-${profile}-${rate}.wav`);await fs.writeFile(browserWav,pcmWav(physical,rate));
       const events=run('decode',browserWav,profile).trim().split('\n').map(JSON.parse);
       assert.deepEqual(events.filter(event=>event.packet).map(event=>event.packet),[value],`${profile}/${rate} browser synth -> C receiver`);
+      }
     }
   }finally{await fs.rm(directory,{recursive:true,force:true});}
 });

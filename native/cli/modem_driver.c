@@ -19,6 +19,9 @@ static int event(void *context, const ac_event *packet) {
     size_t *count=context; (*count)++;
     printf("{\"packet\":\""); hex(packet->payload,packet->payload_bytes); printf("\",\"sender\":%u,\"corrected\":%u}\n",packet->sender,packet->corrected_nibbles); return 0;
 }
+static int audio_profile(const char *name) {
+    return !strcmp(name,"nearby")?TS_AUDIO_NEARBY:!strcmp(name,"telephone")?TS_AUDIO_TELEPHONE:!strcmp(name,"ultrasonic")?TS_AUDIO_ULTRASONIC:-1;
+}
 int main(int argc, char **argv) {
     ts_packet p={0}; ts_pcm pcm={0},physical={0}; char error[512]={0}; int ok=0;
     if (argc>=3 && !strcmp(argv[1],"frame")) {
@@ -27,21 +30,21 @@ int main(int argc, char **argv) {
         len=ts_modem_frame(p.bytes,p.len,argc==4?(uint16_t)strtoul(argv[3],NULL,10):0,out);
         hex(out,len); putchar('\n'); return len?0:1;
     }
-    if (argc==3 && !strcmp(argv[1],"timeline")) {
+    if ((argc==3 || argc==4) && !strcmp(argv[1],"timeline")) {
         char *tl; size_t len;
-        if (!unhex(argv[2],p.bytes,&p.len) || !ts_modem_timeline(p.bytes,p.len,0,&tl,&len)) return 64;
+        if (!unhex(argv[2],p.bytes,&p.len) || !ts_modem_timeline_profile(p.bytes,p.len,0,argc==4?audio_profile(argv[3]):TS_AUDIO_NEARBY,&tl,&len)) return 64;
         fwrite(tl,1,len,stdout); free(tl); return ferror(stdout)?74:0;
     }
     if (argc==6 && !strcmp(argv[1],"render")) {
         if (!unhex(argv[2],p.bytes,&p.len)) return 64;
-        ok=ts_modem_render(&p,&pcm,NULL,error,sizeof(error)) && ts_pcm_profile(&pcm,(unsigned)atoi(argv[4]),!strcmp(argv[5],"telephone"),&physical) && ts_wav_write(argv[3],&physical,error,sizeof(error));
+        ok=ts_modem_render_profile(&p,audio_profile(argv[5]),&pcm,NULL,error,sizeof(error)) && ts_pcm_profile(&pcm,(unsigned)atoi(argv[4]),audio_profile(argv[5]),&physical) && ts_wav_write(argv[3],&physical,error,sizeof(error));
         if (ok) printf("{\"frames\":%zu,\"source_frames\":%zu,\"hash\":\"%016llx\"}\n",physical.frames,pcm.frames,(unsigned long long)pcm.hash);
     } else if (argc==4 && !strcmp(argv[1],"decode")) {
         ac_receiver *receiver=malloc(sizeof(*receiver)); ts_resampler resampler; size_t i,count=0;
         if (!receiver) return 70;
         ok=ts_wav_read(argv[2],&pcm,error,sizeof(error));
         if (ok) {
-            ac_init(receiver,event,&count); ok=ts_resampler_init(&resampler,pcm.rate,!strcmp(argv[3],"telephone"));
+            ac_init(receiver,event,&count); ok=ts_resampler_init(&resampler,pcm.rate,audio_profile(argv[3]));
             for (i=0;ok && i<pcm.frames;i+=997) {
                 size_t n=pcm.frames-i; if (n>997) n=997;
                 ok=ts_resampler_feed(&resampler,receiver,pcm.samples+i,n)==0;

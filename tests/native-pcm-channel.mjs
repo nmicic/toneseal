@@ -30,7 +30,7 @@ export async function createPCMChannel(profile){
           for(let i=0;i<input.length;i+=2048)found.push(...decoder.push(input.slice(i,i+2048)));
           assert.deepEqual(found,[packet],'C-generated waveform must decode once and byte-exactly in the browser');
         }else{
-          const timeline=payloadTimeline(packet,engine.identity),rendered=await runCLI(synth,['--play','packet.tl','--merged','canonical.tl'],{'packet.tl':timeline});
+          const timeline=payloadTimeline(packet,engine.identity,profile),rendered=await runCLI(synth,['--play','packet.tl','--merged','canonical.tl'],{'packet.tl':timeline});
           assert.equal(rendered.code,0,rendered.stderr);
           const step=profile==='telephone'?.75:1,pcm=new Int16Array(Math.ceil(rendered.pcm.length/step));
           for(let i=0;i<pcm.length;i++){const position=i*step,index=Math.min(Math.floor(position),rendered.pcm.length-1),mix=position-Math.floor(position);pcm[i]=Math.max(-32768,Math.min(32767,Math.round(rendered.pcm[index]*(1-mix)+rendered.pcm[Math.min(index+1,rendered.pcm.length-1)]*mix)));}

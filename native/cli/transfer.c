@@ -26,7 +26,7 @@ struct ts_transfer {
 static int packet_equal(const ts_packet *a, const uint8_t *b, size_t n) {
     return a->len==n && CRYPTO_memcmp(a->bytes,b,n)==0;
 }
-static double scale(const ts_transfer *t) { return t->options.telephone?4.0/3:1; }
+static double scale(const ts_transfer *t) { return ts_audio_timing_scale(t->options.audio_profile); }
 static size_t pending_count(const ts_transfer *t) { return t->session?ts_session_pending(t->session,NULL):0; }
 static void phase(ts_transfer *t, int state, const char *reason) {
     t->status.phase=state;
@@ -211,7 +211,7 @@ static void receive_turn(ts_transfer *t, const ts_result *r) {
 ts_transfer *ts_transfer_new(const ts_options *options, const uint8_t *text, size_t len, double now,
                             ts_message_callback message, ts_delivery_callback delivery, void *context) {
     ts_transfer *t; ts_packet p;
-    if (!options || options->mode<TS_MODE_MESSAGE || options->mode>TS_MODE_CLEAR ||
+    if (!options || !ts_audio_profile_valid(options->audio_profile) || options->mode<TS_MODE_MESSAGE || options->mode>TS_MODE_CLEAR ||
         (options->chat && options->mode!=TS_MODE_MESSAGE) || options->idle_ms<1000 || options->idle_ms>120000 ||
         (options->sender?(!len || len>96 || !ts_utf8_valid(text,len)):len!=0)) return NULL;
     t=calloc(1,sizeof(*t)); if (!t) return NULL;

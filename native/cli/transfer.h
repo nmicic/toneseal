@@ -2,13 +2,14 @@
 #ifndef TONESEAL_TRANSFER_H
 #define TONESEAL_TRANSFER_H
 #include "session.h"
+#include "audio_profile.h"
 
 enum { TS_MODE_MESSAGE, TS_MODE_PASSWORD, TS_MODE_CLEAR };
 enum { TS_IDLE, TS_DISCOVERING, TS_VERIFY, TS_CONFIRMING, TS_REFRESHING,
        TS_RECEIVING, TS_SENDING, TS_CONNECTED, TS_CLOSING, TS_DELIVERED,
        TS_RECEIVED, TS_CLOSED, TS_STOPPED, TS_FAILED };
 typedef struct {
-    int sender, mode, chat, profile, telephone, verify, auto_close;
+    int sender, mode, chat, profile, audio_profile, verify, auto_close;
     unsigned idle_ms;
 } ts_options;
 typedef struct {

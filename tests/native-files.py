@@ -4,6 +4,7 @@
 import array
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import random
@@ -255,5 +256,33 @@ class NativeFiles(unittest.TestCase):
         manifest = json.loads(self.run_cli('capabilities').stdout)
         self.assertIn('text', manifest['commands'])
         self.assertEqual(manifest['textConversions']['actions'], ['to-tl', 'from-tl', 'to-wav', 'from-wav'])
+
+    def test_17_ultrasonic_text_round_trip_and_audible_interference(self):
+        text = ('\u00e9'*48).encode()
+        timeline = self.name('ultrasonic.tl')
+        self.run_cli('text', 'to-tl', '--profile', 'ultrasonic', '--output', timeline, data=text)
+        self.assertIn(b'length_ns 8320000000\n', timeline.read_bytes())
+        self.assertEqual(self.run_cli('text', 'from-tl', '--profile', 'ultrasonic', '--input', timeline).stdout, text)
+        self.run_cli('text', 'from-tl', '--input', timeline, code=1)
+        for rate in (48000, 44100):
+            with self.subTest(rate=rate):
+                name = self.name(str(rate)+'.wav')
+                self.run_cli('text', 'to-wav', '--profile', 'ultrasonic', '--rate', rate, '--output', name, data=text)
+                with wave.open(str(name), 'rb') as recording:
+                    self.assertAlmostEqual(recording.getnframes()/rate, 8.32)
+                    samples = array.array('h', recording.readframes(recording.getnframes()))
+                if sys.byteorder != 'little': samples.byteswap()
+                self.assertEqual(self.run_cli('text', 'from-wav', '--profile', 'ultrasonic', '--input', name).stdout, text)
+                rng = random.Random(0x7192)
+                for i, value in enumerate(samples):
+                    sample = round(value*.7+8000*math.cos(2*math.pi*7000*i/rate)+rng.randint(-8, 8))
+                    self.assertLess(abs(sample), 32768, 'synthetic interference must not clip the microphone')
+                    samples[i] = sample
+                if sys.byteorder != 'little': samples.byteswap()
+                noisy = self.name(str(rate)+'-noisy.wav')
+                with wave.open(str(noisy), 'wb') as recording:
+                    recording.setparams((1, 2, rate, 0, 'NONE', 'not compressed')); recording.writeframes(samples.tobytes())
+                self.assertEqual(self.run_cli('text', 'from-wav', '--profile', 'ultrasonic', '--input', noisy).stdout, text)
+                self.run_cli('text', 'from-wav', '--input', noisy, code=1)
 
 if __name__ == '__main__': unittest.main(verbosity=2)

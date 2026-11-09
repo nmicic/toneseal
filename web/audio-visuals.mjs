@@ -4,6 +4,7 @@
 // Reuse its unchanged cursor FFT from media.mjs. This display owns no audio,
 // permissions or recording; only a bounded PCM window and a six-second raster.
 import {createCursorSpectrum} from './media.mjs';
+import {getAudioProfile} from './audio-profiles.mjs';
 
 const SIZE = 2048, SCOPE_SIZE = 512, STEP_MS = 100, HISTORY_COLUMNS = 60, HISTORY_ROWS = 64;
 const VIEWS = ['tones','scope','spectrum','peaks'];
@@ -80,7 +81,7 @@ export function createAudioVisuals(container, {
   let profile = 'nearby', motion = 'idle', destroyed = false, raf = null, lastTick = 0;
   let width = 0, height = 0, pixelRatio = 1, pcm = null, analyzer = null, sampleRate = 0, column = null;
   let historyAt = null, held = false, hasDrawn = false, fault = !context || !historyContext, lastMetadata = '';
-  const band = () => profile === 'telephone' ? {min:450,max:2812.5} : {min:600,max:3750};
+  const band = () => {const selected=getAudioProfile(profile);return {min:selected.minHz,max:selected.maxHz};};
   const collapsed = () => userCollapsed || keyboardCompact;
   const getState = () => ({view,collapsed:collapsed(),active,source,motion,profile});
   const notify = () => {
@@ -271,7 +272,7 @@ export function createAudioVisuals(container, {
   }
   function refresh() {
     if (destroyed) return;
-    const nextProfile=getProfile()==='telephone'?'telephone':'nearby';
+    let nextProfile='nearby';try{nextProfile=getAudioProfile(getProfile()).id;}catch{}
     if (profile!==nextProfile) {profile=nextProfile;release();source=null;idlePlot();}
     active=!document.hidden && Boolean(getActive());
     if(!active || collapsed() || fault) {

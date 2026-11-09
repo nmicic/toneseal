@@ -3,6 +3,7 @@
 #define TONESEAL_MODEM_H
 #include "session.h"
 #include "portable_core.h"
+#include "audio_profile.h"
 #include <signal.h>
 #include <stdint.h>
 #include <stddef.h>
@@ -14,11 +15,16 @@ typedef struct {
     unsigned step,den;
     int16_t previous,buffer[1024]; size_t count;
     int started;
+    int audio_profile; unsigned input_rate,carrier_phase,filter_at;
+    int16_t filter_history[128];
 } ts_resampler;
 size_t ts_modem_frame(const uint8_t *, size_t, uint16_t, uint8_t[196]);
 int ts_modem_timeline(const uint8_t *, size_t, uint16_t, char **, size_t *);
+int ts_modem_timeline_profile(const uint8_t *, size_t, uint16_t, int, char **, size_t *);
 int ts_modem_render(const ts_packet *, ts_pcm *, volatile sig_atomic_t *, char *, size_t);
+int ts_modem_render_profile(const ts_packet *, int, ts_pcm *, volatile sig_atomic_t *, char *, size_t);
 int ts_modem_record(const ts_packet *, char **, size_t *, volatile sig_atomic_t *, char *, size_t);
+int ts_modem_record_profile(const ts_packet *, int, char **, size_t *, volatile sig_atomic_t *, char *, size_t);
 int ts_timeline_read(const char *, ts_pcm *, volatile sig_atomic_t *, char *, size_t);
 void ts_pcm_free(ts_pcm *);
 int ts_pcm_profile(const ts_pcm *, unsigned, int, ts_pcm *);

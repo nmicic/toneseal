@@ -71,7 +71,7 @@ static void help(void) {
          "  capabilities  Print the machine-readable command/limit manifest\n"
          "\nOptions:\n"
          "  --mode message|password|clear  (default message)\n"
-         "  --profile nearby|telephone    (default nearby; telephone experimental)\n"
+         "  --profile nearby|telephone|ultrasonic  (default nearby; others experimental)\n"
          "  --crypto p256|x25519          (default p256; no fallback)\n"
          "  --verify                     Compare every fingerprint group, then /confirm\n"
          "  --single                     One-shot Message, matching web chat disabled\n"
@@ -108,8 +108,9 @@ static void text_help(void) {
          "--output FILE|-   New 0600 output file; to-wav requires a file.\n"
          "                  TL/text default to stdout; redirected text is byte-exact.\n"
          "--json            Metadata/events; to-tl needs an output file in JSON mode.\n"
-         "--profile nearby|telephone --rate 44100|48000  WAV encoding options.\n"
-         "Match --profile when decoding a WAV. TL is always canonical mono 48 kHz.\n"
+         "--profile nearby|telephone|ultrasonic --rate 44100|48000  WAV options.\n"
+         "Match --profile when decoding. TL supports nearby/ultrasonic at 48 kHz.\n"
+         "Ultrasonic is experimental near-ultrasound (18.4-19.975 kHz), very slow.\n"
          "\nThese are ToneSeal text-over-sound conversions, 1-96 UTF-8 bytes.\n"
          "They do not interpret arbitrary synth music as text or provide encryption.\n"
          "Files/pipes preserve spaces, newlines and NUL bytes; nothing is trimmed.\n"
@@ -155,7 +156,7 @@ static int parse(int argc, char **argv, options *o) {
             else if (!strcmp(optarg,"clear")) o->mode=TS_MODE_CLEAR;
             else return 0;
             break;
-        case PROFILE: if (!strcmp(optarg,"nearby")) o->profile=0; else if (!strcmp(optarg,"telephone")) o->profile=1; else return 0; break;
+        case PROFILE: if (!strcmp(optarg,"nearby")) o->profile=TS_AUDIO_NEARBY; else if (!strcmp(optarg,"telephone")) o->profile=TS_AUDIO_TELEPHONE; else if (!strcmp(optarg,"ultrasonic")) o->profile=TS_AUDIO_ULTRASONIC; else return 0; break;
         case CRYPTO: if (!strcmp(optarg,"p256")) o->crypto=TS_P256; else if (!strcmp(optarg,"x25519")) o->crypto=TS_X25519; else return 0; break;
         case VERIFY: o->verify=1; break;
         case SINGLE: o->single=1; break;
@@ -178,7 +179,7 @@ static int parse(int argc, char **argv, options *o) {
     #define BIT(name) (UINT32_C(1)<<((name)-MODE))
     if (o->file==FILE_TO_WAV) allowed=BIT(MODE)|BIT(INPUT)|BIT(OUTPUT)|BIT(PROFILE)|BIT(RATE)|BIT(JSON);
     else if (o->file==FILE_FROM_WAV) allowed=BIT(MODE)|BIT(INPUT)|BIT(OUTPUT)|BIT(PROFILE)|BIT(JSON)|BIT(PACKETS);
-    else if (o->file==FILE_TO_TL || o->file==FILE_FROM_TL) allowed=BIT(MODE)|BIT(INPUT)|BIT(OUTPUT)|BIT(JSON);
+    else if (o->file==FILE_TO_TL || o->file==FILE_FROM_TL) allowed=BIT(MODE)|BIT(INPUT)|BIT(OUTPUT)|BIT(JSON)|BIT(PROFILE);
     else if (!strcmp(o->command,"devices") || !strcmp(o->command,"capabilities")) allowed=BIT(JSON);
     else if (!strcmp(o->command,"audio-probe")) allowed=BIT(INPUT_DEVICE)|BIT(OUTPUT_DEVICE)|BIT(DURATION)|BIT(JSON);
     else allowed=BIT(MODE)|BIT(PROFILE)|BIT(CRYPTO)|BIT(VERIFY)|BIT(SINGLE)|BIT(INPUT)|BIT(OUTPUT)|BIT(INPUT_DEVICE)|BIT(OUTPUT_DEVICE)|BIT(TIMEOUT)|BIT(JSON)|BIT(SEND)|BIT(CONTROL);
@@ -189,6 +190,7 @@ static int parse(int argc, char **argv, options *o) {
         (o->file==FILE_TO_WAV && (!o->output || !strcmp(o->output,"-"))) ||
         ((o->file==FILE_FROM_WAV || o->file==FILE_FROM_TL) && !o->input) ||
         (o->file==FILE_TO_TL && o->json && !o->output) ||
+        ((o->file==FILE_TO_TL || o->file==FILE_FROM_TL) && o->profile==TS_AUDIO_TELEPHONE) ||
         (o->send && strcmp(o->command,"chat")) || (o->packets && o->file!=FILE_FROM_WAV) ||
         (o->verify && o->mode==TS_MODE_CLEAR) || (!strcmp(o->command,"receive") && o->input) ||
         (!strcmp(o->command,"chat") && !o->send && o->input) ||
@@ -269,7 +271,7 @@ static int decoded(void *data, const ac_event *event) {
 }
 static int timeline_output(options *o, const ts_packet *packet, char *error, size_t cap) {
     context ctx={0}; char *timeline=NULL; size_t len=0; int ok=0;
-    if (!ts_modem_record(packet,&timeline,&len,&stop_signal,error,cap)) return 0;
+    if (!ts_modem_record_profile(packet,o->profile,&timeline,&len,&stop_signal,error,cap)) return 0;
     ctx.options=*o; if (!ctx.options.output) ctx.options.output="-";
     if (output_open(&ctx) && write_bytes(ctx.output_fd,(const uint8_t *)timeline,len) &&
         (!ctx.output_created || fsync(ctx.output_fd)==0)) { ctx.output_written=1; ok=1; }
@@ -285,7 +287,7 @@ static int file_command(options *o) {
         if (!read_input(o,text,&len,0)) return stop_signal?128+stop_signal:2;
         if (!ts_clear_data(text,len,&p)) snprintf(error,sizeof(error),"Cannot prepare the ToneSeal cleartext packet.");
         else if (o->file==FILE_TO_TL) { if (timeline_output(o,&p,error,sizeof(error))) result=0; }
-        else if (ts_modem_render(&p,&pcm,&stop_signal,error,sizeof(error)) &&
+        else if (ts_modem_render_profile(&p,o->profile,&pcm,&stop_signal,error,sizeof(error)) &&
             ts_pcm_profile(&pcm,o->rate,o->profile,&physical) && ts_wav_write(o->output,&physical,error,sizeof(error))) {
             if (o->json) printf("{\"schemaVersion\":1,\"type\":\"encoded\",\"format\":\"wav\",\"encrypted\":false,\"frames\":%zu,\"rate\":%u}\n",physical.frames,physical.rate);
             else fprintf(stderr,"Cleartext WAV written; no pairing or receipt is implied.\n");
@@ -360,7 +362,7 @@ static int live(options *o) {
     uint64_t old_drops=0,crc_total=0; double last_status=0; char error[512]={0};
     settings.sender=!strcmp(o->command,"send") || (!strcmp(o->command,"chat") && o->send);
     settings.mode=o->mode; settings.chat=o->mode==TS_MODE_MESSAGE && !o->single; settings.profile=o->crypto;
-    settings.telephone=o->profile; settings.verify=o->verify; settings.auto_close=strcmp(o->command,"chat")!=0; settings.idle_ms=o->timeout*1000;
+    settings.audio_profile=o->profile; settings.verify=o->verify; settings.auto_close=strcmp(o->command,"chat")!=0; settings.idle_ms=o->timeout*1000;
     if (settings.sender && !read_input(o,input,&input_len,!strcmp(o->command,"chat") && !o->input)) return stop_signal?128+stop_signal:2;
     if (o->control_stdin || isatty(STDIN_FILENO) || !strcmp(o->command,"chat")) control_fd=STDIN_FILENO;
     else { control_fd=open("/dev/tty",O_RDONLY|O_NONBLOCK); if (control_fd>=0) own_control=1; }
@@ -373,7 +375,7 @@ static int live(options *o) {
     ac_init(receiver,decoded,&ctx); ts_resampler_init(&resampler,metrics.rate,o->profile);
     ctx.transfer=ts_transfer_new(&settings,input,input_len,ts_clock_ms(),message,delivery,&ctx); OPENSSL_cleanse(input,sizeof(input));
     if (!ctx.transfer) { snprintf(error,sizeof(error),"Cannot initialize the transfer."); goto done; }
-    if (!o->json) fprintf(stderr,"%s · %s · %s. Output gain 100%%; adjust your device volume. Ctrl+C stops.\n",settings.mode==TS_MODE_CLEAR?"Unencrypted":o->verify?"Encrypted, fingerprint comparison required":"Encrypted, initial peer unverified",o->profile?"Telephone (experimental)":"Nearby",o->crypto==TS_X25519?"X25519":"P-256");
+    if (!o->json) fprintf(stderr,"%s · %s · %s. Output gain 100%%; adjust your device volume. Ctrl+C stops.\n",settings.mode==TS_MODE_CLEAR?"Unencrypted":o->verify?"Encrypted, fingerprint comparison required":"Encrypted, initial peer unverified",o->profile==TS_AUDIO_ULTRASONIC?"Near-ultrasonic (experimental; keep devices still)":o->profile==TS_AUDIO_TELEPHONE?"Telephone (experimental)":"Nearby",o->crypto==TS_X25519?"X25519":"P-256");
     for (;;) {
         int16_t block[2048]; size_t n,budget=0; ts_packet packet; double now=ts_clock_ms();
         ts_transfer_tick(ctx.transfer,now); ts_transfer_status(ctx.transfer,&status);
@@ -456,7 +458,7 @@ int main(int argc, char **argv) {
         puts("{\"schemaVersion\":1,\"type\":\"capabilities\",\"version\":\"0.1.0\",\"experimental\":true,"
              "\"commands\":[\"send\",\"receive\",\"chat\",\"text\",\"encode\",\"decode\",\"devices\",\"audio-probe\",\"capabilities\"],"
              "\"textConversions\":{\"actions\":[\"to-tl\",\"from-tl\",\"to-wav\",\"from-wav\"],\"encoding\":\"toneseal-text-over-sound\",\"maxTextBytes\":96,\"timelineMaxBytes\":200000,\"timelineRate\":48000},"
-             "\"modes\":[\"message\",\"password\",\"clear\"],\"profiles\":[\"nearby\",\"telephone\"],\"crypto\":[\"p256\",\"x25519\"],\"maxTextBytes\":96,\"maxPending\":8,"
+             "\"modes\":[\"message\",\"password\",\"clear\"],\"profiles\":[\"nearby\",\"telephone\",\"ultrasonic\"],\"crypto\":[\"p256\",\"x25519\"],\"maxTextBytes\":96,\"maxPending\":8,"
              "\"peerIdleSeconds\":{\"default\":60,\"min\":1,\"max\":120},\"localCommands\":[\"/confirm\",\"/quit\",\"/stop\",\"/reveal\",\"/send TEXT\"],"
              "\"events\":[\"status\",\"message\",\"password\",\"delivered\",\"encoded\",\"packet\",\"audio-level\"],\"passwordMasked\":true,\"automaticClipboard\":false,\"automaticPeerAuthentication\":false}");
         return fflush(stdout)==EOF || ferror(stdout)?2:0;

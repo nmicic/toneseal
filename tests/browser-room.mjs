@@ -77,7 +77,7 @@ async function transmit(side,bytes,profile,turn){
   if(!peer){row.dropReason='peer not open';return {metrics:{}};}
   let decoded=[packet],metrics={};
   if(channel==='pcm'){
-    const rendered=await runCLI(synth,['--play','record.tl','--merged','canonical.tl'],{'record.tl':payloadTimeline(packet,engine.identity)});
+    const rendered=await runCLI(synth,['--play','record.tl','--merged','canonical.tl'],{'record.tl':payloadTimeline(packet,engine.identity,profile)});
     assert.equal(rendered.code,0,rendered.stderr);
     const decoder=await StreamingDecoder.create(receiver,48000,profile),samples=capture(rendered.pcm,profile,0x38473+log.frames.length);
     decoded=[];for(let offset=0;offset<samples.length;offset+=2048)decoded.push(...decoder.push(samples.slice(offset,offset+2048)));

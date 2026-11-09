@@ -46,7 +46,7 @@ int main(int argc, char **argv) {
     options.chat=!strcmp(argv[2],"chat");
     options.mode=!strcmp(argv[2],"password")?TS_MODE_PASSWORD:!strcmp(argv[2],"clear")?TS_MODE_CLEAR:TS_MODE_MESSAGE;
     options.sender=!strcmp(argv[3],"send"); options.verify=atoi(argv[4]); options.auto_close=atoi(argv[5]);
-    options.idle_ms=argc>=8?(unsigned)atoi(argv[7]):60000; options.telephone=argc==9?atoi(argv[8]):0;
+    options.idle_ms=argc>=8?(unsigned)atoi(argv[7]):60000; options.audio_profile=argc==9?atoi(argv[8]):0;
     if (!unhex(argv[6],initial,&len)) return 64;
     t=ts_transfer_new(&options,initial,len,0,message,delivery,NULL); OPENSSL_cleanse(initial,sizeof(initial)); if (!t) return 64;
     while (fgets(line,sizeof(line),stdin)) {

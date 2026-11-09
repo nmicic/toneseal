@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Nenad Micic
 // SPDX-License-Identifier: Apache-2.0
 // Experimental protected four-tone profile. This writes TL; only C reads TL.
+import {getAudioProfile} from './audio-profiles.mjs';
 export const acousticLimits = Object.freeze({sampleRate:48000, seconds:20, textBytes:127, wireBytes:128,
   jsonMessages:8, workerSeconds:60, fileBytes:4 * 1024 * 1024});
 export const preamble = Uint8Array.from([0,255,85,170,51,204,105,150]);
@@ -43,21 +44,23 @@ export function payloadText(bytes) {
   if(!(bytes instanceof Uint8Array)||bytes.length<2||bytes.length>128||bytes[0]!==0)throw Error('Unsupported application payload; raw text mode is required.');
   return textDecoder.decode(bytes.slice(1));
 }
-export function glyphFrequencies(value) {
+export function glyphFrequencies(value,profile='nearby') {
   if(!Number.isInteger(value)||value<0||value>255)throw Error('Glyph must be a byte.');
-  return [0,1,2,3].map(band=>600+50*(band*16+((value>>4)^mul(value&15,band))));
+  const audio=getAudioProfile(profile);
+  return [0,1,2,3].map(band=>audio.toneBaseHz+audio.toneStepHz*(band*16+((value>>4)^mul(value&15,band))));
 }
 export function messageTimeline(text,engine) {
   return payloadTimeline(textPayload(text),engine);
 }
-export function payloadTimeline(payload,engine) {
+export function payloadTimeline(payload,engine,profile='nearby') {
   if(typeof engine!=='string'||!/^a1(?: [A-Za-z_][A-Za-z0-9_]*=[A-Za-z0-9_-]+)+$/.test(engine))throw Error('Native engine identity is unavailable.');
+  const audio=getAudioProfile(profile),scale=audio.symbolMs/20;
   const values=Uint8Array.from([...preamble,...encodePayload(payload)]);
-  const rows=['timeline draft1','engine '+engine,'fs 48000','length_ns '+((80+values.length*20)*1000000),'streams message',
+  const rows=['timeline draft1','engine '+engine,'fs 48000','length_ns '+((80*scale+values.length*audio.symbolMs)*1000000),'streams message',
     'patch sine 0 65536 300 0 0 0 1 1 0 1','patch sine 1 65536 0 0 0 0 1 1 0 1',
     ...[0,1,2,3].map(voice=>'voice '+voice+' sine')];
-  values.forEach((value,index)=>{const start=(40+index*20)*1000000;glyphFrequencies(value).forEach((frequency,voice)=>{
-    rows.push(start+' message '+voice+' on '+(frequency*1000)+' 32767');rows.push((start+18000000)+' message '+voice+' off');});});
+  values.forEach((value,index)=>{const start=(40*scale+index*audio.symbolMs)*1000000;glyphFrequencies(value,profile).forEach((frequency,voice)=>{
+    rows.push(start+' message '+voice+' on '+(frequency*1000)+' 32767');rows.push((start+18000000*scale)+' message '+voice+' off');});});
   return rows.join('\n')+'\n';
 }
 // Nominal-rate conversion only. This does not estimate physical clock drift.

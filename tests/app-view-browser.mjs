@@ -202,6 +202,10 @@ async function checkLayout(page,label,{compact=false}={}){
 
 async function passwordOptionsLayout(page,label,{compact=false}={}){
   if(!await page.locator('#transfer-options').evaluate(node=>node.open))await page.locator('#app-options').click();
+  const previousProfile=await page.locator('#audio-profile').inputValue();
+  await page.locator('#audio-profile').selectOption('ultrasonic');
+  await page.waitForFunction(()=>document.querySelector('#audio-visual-canvas').dataset.profile==='ultrasonic');
+  assert.match(await page.locator('#audio-profile-hint').textContent(),/Experimental.*both devices/);
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   const layout=await page.evaluate(()=>{
     const options=document.getElementById('transfer-options'),content=document.getElementById('app-view-content'),composer=document.getElementById('app-view-composer'),main=document.querySelector('body > main');
@@ -225,6 +229,8 @@ async function passwordOptionsLayout(page,label,{compact=false}={}){
   }
   await reachable(page,'#audio-profile',`${label}/audio connection`);
   await reachable(page,'#auto-start',`${label}/primary action`);
+  await screenshot(page,`${label.replaceAll(/[^a-zA-Z0-9-]/g,'-')}-ultrasonic-options`);
+  await page.locator('#audio-profile').selectOption(previousProfile);
   await page.locator('#app-options').click();
   assert.equal(await page.locator('#transfer-options').evaluate(node=>node.open),false);
 }

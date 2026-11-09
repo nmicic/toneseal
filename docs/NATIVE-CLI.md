@@ -96,7 +96,7 @@ printf '%s' 'Hello from the terminal' | build/toneseal send --mode clear
 | Live option | Meaning |
 | --- | --- |
 | `--mode message\|password\|clear` | Message default; chat accepts Message only. |
-| `--profile nearby\|telephone` | Nearby default; Telephone plays the verified waveform at 75% speed/pitch. |
+| `--profile nearby\|telephone\|ultrasonic` | Nearby default; Telephone lowers speed/pitch; near-ultrasonic is a separate very slow experimental waveform. |
 | `--crypto p256\|x25519` | Compatible P-256 default; explicitly selected Compact X25519. |
 | `--verify` | Wait for `/confirm` after a trusted full fingerprint comparison. |
 | `--single` | One-shot Message protocol, without continuing chat. |
@@ -133,6 +133,13 @@ channel; mono output is duplicated to stereo where supported. Application gain
 is **100%**; system volume is unchanged. Permissions, headphones, echo cancellation,
 voice isolation and feedback can prevent reception. Keep devices awake and
 choose appropriate devices; `audio-probe` helps check microphone input.
+
+`--profile ultrasonic` uses 18.4–19.975 kHz tone centers, 40 ms symbols and at
+most 8.32 seconds per packet. Choose it on both nearby devices and keep them
+still. Test a dummy Clear text transfer first; hardware support and physical
+call/room performance are unqualified. The browser uses the same implementation
+contract, so its Near-ultrasonic option matches the CLI. `--timeout 120` gives
+loss repairs more time; the default remains 60 seconds with no automatic change.
 
 The initial sender owns the chat poll clock, without wall-clock synchronization.
 Later messages reuse established keys. Bitmap receipts and exact ciphertext
@@ -204,7 +211,7 @@ renders and verifies that waveform and its canonical replay, then decodes the
 sound. Text is not recovered from comments or hidden plaintext. Draft TL without
 a saved hash is also accepted and checked by canonical replay. Engine identity
 must match the installed synth; TL input is bounded to 200,000 UTF-8 bytes,
-mono 48 kHz and six seconds. Truncated, malformed and hash-mismatched records
+mono 48 kHz and twelve seconds. Truncated, malformed and hash-mismatched records
 fail without creating a decoded output file.
 
 ```sh
@@ -215,8 +222,10 @@ build/toneseal text --help
 ```
 
 WAV encoding requires a new `--output FILE`. `--rate 44100|48000` and
-`--profile nearby|telephone` apply to WAVs; use the matching profile for decoding.
-TL always retains the canonical 48 kHz timeline. Both inverse commands accept
+`--profile nearby|telephone|ultrasonic` apply to WAVs; use the matching profile for decoding.
+TL supports Nearby and Near-ultrasonic, always at 48 kHz; specify matching
+`--profile ultrasonic` for both TL conversions. Telephone uses Nearby TL with
+physical playback scaling. Both inverse commands accept
 `--input -` for stdin and default to stdout. `--json` exposes metadata/events;
 `to-tl --json` requires a separate output file to keep its stdout valid JSON.
 `capabilities` lists all four actions under `textConversions`.

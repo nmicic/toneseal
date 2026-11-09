@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Nenad Micic
 // SPDX-License-Identifier: Apache-2.0
 import {getAudioProfile} from './audio-profiles.mjs';
+import {UltrasonicInput} from './ultrasonic-input.mjs';
 // Two bounded, staggered native receivers preserve packets across resets.
 const RATE = 48000, EPOCH = RATE * 12, STAGGER = EPOCH / 2;
 const same = (a,b) => a.length === b.length && a.every((value,i) => value === b[i]);
@@ -16,7 +17,8 @@ export class StreamingDecoder {
   }
   constructor(apis,rate,profile = 'nearby') {
     this.rate=rate;this.profile=getAudioProfile(profile);
-    this.step=rate/(RATE*this.profile.playbackRate);
+    this.step=rate/(RATE*this.profile.decodeRate);
+    this.frontend=this.profile.id==='ultrasonic'?new UltrasonicInput(rate):null;
     this.states=apis.map(api=>{
       if(api.memory.buffer.byteLength>262144)throw Error('Decoder memory exceeds its limit.');
       return {api,input:new Int16Array(api.memory.buffer,api.acoustic_input(),4096),start:0,fed:0,reported:0,deadline:0,counters:{}};
@@ -30,6 +32,7 @@ export class StreamingDecoder {
     state.api.acoustic_reset();state.start=start;state.fed=0;state.reported=0;state.counters={};
   }
   reset() {
+    this.frontend?.reset();
     this.position=0;this.inputCount=0;this.previous=0;this.outputCount=0;this.recent=[];
     this.resetState(this.states[0],0);this.resetState(this.states[1],STAGGER);
     this.states[0].deadline=EPOCH;this.states[1].deadline=STAGGER+EPOCH;
@@ -37,6 +40,7 @@ export class StreamingDecoder {
   convert(samples) {
     if(!(samples instanceof Float32Array)||!samples.length||samples.length>8192)throw Error('Invalid streaming audio chunk.');
     for(const sample of samples)if(!Number.isFinite(sample))throw Error('Non-finite input sample.');
+    if(this.frontend)samples=this.frontend.push(samples);
     if(this.step===1){
       this.inputCount+=samples.length;
       return Int16Array.from(samples,value=>Math.max(-32768,Math.min(32767,Math.round(value*32768))));

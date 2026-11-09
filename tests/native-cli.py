@@ -26,7 +26,7 @@ def main():
         run(['python3', 'scripts/build-cli.py', *([] if kind == 'cli' else ['--'+kind]), *(['--sanitize'] if args.sanitize else [])])
     if args.pcm:
         run(['node', '--test', 'tests/native-modem.mjs'], TONESEAL_BROWSER_PCM='1')
-        for case in ('password-C-sender', 'chat-C-receiver', 'telephone-chat'):
+        for case in ('password-C-sender', 'chat-C-receiver', 'telephone-chat', 'ultrasonic-password', 'ultrasonic-chat'):
             run(['node', 'tests/native-transfer.mjs'], TONESEAL_TRANSFER_PCM='1', TONESEAL_CASE=case)
         return
     run([str(ROOT/'build/session-boundaries')])

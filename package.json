@@ -9,7 +9,7 @@
     "build:cli": "python3 scripts/build-cli.py",
     "test:cli": "python3 tests/native-cli.py",
     "test:cli:pcm": "python3 tests/native-cli.py --pcm",
-    "test": "python3 tests/build-web.py && node --test tests/session.mjs tests/auto-transfer.mjs tests/demo-identity.mjs tests/artifact-transfer.mjs tests/chat-transfer.mjs tests/audio-visual-taps.mjs tests/peer-idle.mjs tests/codec-vectors.mjs",
+    "test": "python3 tests/build-web.py && python3 scripts/ultrasonic-tables.py --check && node --test tests/session.mjs tests/auto-transfer.mjs tests/demo-identity.mjs tests/artifact-transfer.mjs tests/chat-transfer.mjs tests/audio-visual-taps.mjs tests/peer-idle.mjs tests/codec-vectors.mjs tests/ultrasonic.mjs",
     "test:simulation": "node tests/simulated-transfer.mjs",
     "test:acoustic": "node tests/acoustic-impairments.mjs",
     "test:telephone": "node tests/telephone-channel.mjs",

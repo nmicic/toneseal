@@ -69,6 +69,11 @@ Choose Nearby on both devices for same-room testing. Telephone is a slower,
 experimental profile for testing an audio relay through a call. Call processing
 can prevent delivery; the app does not automatically negotiate profiles.
 
+Near-ultrasonic is a very slow experimental option for nearby stationary
+devices: 18.4–19.975 kHz carrier centers and 40 ms symbols. Its shared browser/C
+receiver preserves packet framing and cryptography. Device filtering and loud
+room clipping can prevent reception; physical compatibility remains unqualified.
+
 The default Compatible key exchange is P-256. Compact uses X25519 when the
 browser supports it. Both sides must select the same profile. AES-256-GCM,
 HKDF-SHA256 and the full authentication tag remain fixed. This is classical,
@@ -78,7 +83,8 @@ not post-quantum, cryptography.
 
 - A byte selects a redundant four-tone pattern through a GF(16) (4,2) mapping.
 - Nearby sends one pattern every 20 ms over 600–3750 Hz. Telephone lowers the band
-  and extends its duration. The modulation is coded multitone FSK.
+  and extends its duration. Near-ultrasonic remaps the tones to 18.4–19.975 kHz
+  with 40 ms symbols. The modulation is coded multitone FSK.
 - The sender renders a local four-voice timeline through JotTune Synth and checks
   its canonical replay. Timelines are not transferred to the receiver.
 - The portable C receiver uses an integer 960-point Fourier transform, per-band

@@ -247,6 +247,13 @@ async function appCase(browser, name, options) {
     await page.waitForFunction(() => document.querySelector('#audio-visual-canvas').dataset.profile === 'telephone');
     assert.equal(Number(await page.locator('#audio-visual-canvas').getAttribute('data-min-hz')), 450);
     assert.equal(Number(await page.locator('#audio-visual-canvas').getAttribute('data-max-hz')), 2812.5);
+    await page.locator('#audio-profile').selectOption('ultrasonic');
+    await page.waitForFunction(() => document.querySelector('#audio-visual-canvas').dataset.profile === 'ultrasonic');
+    assert.equal(Number(await page.locator('#audio-visual-canvas').getAttribute('data-min-hz')),18400);
+    assert.equal(Number(await page.locator('#audio-visual-canvas').getAttribute('data-max-hz')),19975);
+    assert.match(await page.locator('#audio-profile-hint').textContent(),/Experimental/);
+    await checkDockLayout(page,`${name}/ultrasonic`);
+    await page.screenshot({path:path.join(shots,`${name}-ultrasonic.png`)});
     await page.locator('#audio-profile').selectOption('nearby');
     await page.waitForFunction(() => document.querySelector('#audio-visual-canvas').dataset.profile === 'nearby');
     assert.equal(Number(await page.locator('#audio-visual-canvas').getAttribute('data-min-hz')), 600);

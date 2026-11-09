@@ -74,5 +74,10 @@
     "loss": "The original initiator retries a lost COMMIT; the responder repeats its retained ACK. A lost final notice causes bounded, receive-only linger on the responder. Silence never confirms peer closure. Duplicate controls do not extend the deadline.",
     "limits": "Closing is bounded by a close deadline and the original ten-minute session limit. remainingMs reflects the current deadline. Stop now never waits. Closing must not turn a Pending message into Delivered; only its application receipt can do that.",
     "compatibility": "Authenticated close uses chat wire versions 6 (P-256) and 7 (X25519). Earlier chat versions 4/5 cannot join. Both peers must open the same current release. Single-transfer versions 2/3 remain unchanged."
+  },
+  "audioProfiles": {
+    "nearby": "Default; faster audible tones for nearby devices.",
+    "telephone": "Experimental; slow lower-band tones for call relays.",
+    "ultrasonic": "Experimental; very slow near-ultrasonic tones at 18.4–19.975 kHz. Keep nearby devices still. Hardware support is unqualified; select the same profile on both devices. No automatic fallback."
   }
 }

@@ -363,15 +363,19 @@ function render() {
   el('example-hint').hidden = mode === 'password' || state.active;
   el('example-hint').textContent = bytes > 0 ? 'Clear your draft before using Send example.' : 'Sender only: send the current time as a test.';
   el('audio-profile').disabled = state.active;
-  const telephone = getAudioProfile(el('audio-profile').value).id === 'telephone';
+  const audioProfile = getAudioProfile(el('audio-profile').value);
+  const telephone = audioProfile.id === 'telephone', ultrasonic = audioProfile.id === 'ultrasonic';
   el('crypto-profile').disabled = state.active;
   el('crypto-profile').querySelector('[value="x25519"]').disabled = compactSupport !== 'supported';
   el('crypto-profile-hint').textContent = (mode === 'clear' ? 'These settings apply to Message and Password. Clear text does not use encryption. ' : '') + (cryptoProfile.id === 'x25519'
-      ? `Choose Compact on both devices. Public keys use 32 bytes; pairing packets use 51 bytes. Pairing and rekey save ${telephone ? '4.8' : '3.6'} seconds of waveform airtime versus Compatible, before retries and processing. No automatic switch.`
+      ? `Choose Compact on both devices. Public keys use 32 bytes; pairing packets use 51 bytes. Pairing and rekey save ${(3.6*audioProfile.timingScale).toFixed(1)} seconds of waveform airtime versus Compatible, before retries and processing. No automatic switch.`
       : 'Choose Compatible on both devices. Public keys use 65 bytes; pairing packets use 84 bytes. This preserves the existing P-256 exchange.');
   el('crypto-capability').textContent = compactSupport === 'checking' ? 'Checking compact key exchange support…'
     : compactSupport === 'supported' ? 'Compact key exchange is supported by this browser. The other device must support it too.' : compactError;
-  el('audio-profile-hint').textContent = app ? telephone
+  el('audio-profile-hint').textContent = ultrasonic
+    ? app ? 'Experimental: choose Near-ultrasonic on both devices. Keep nearby devices still. Hardware may filter these tones.'
+      : 'Experimental 18.4–19.975 kHz tones, twice the Nearby duration. Keep devices close and still; high-frequency support varies. For nearby devices, not phone calls. No automatic switch.'
+    : app ? telephone
     ? 'Choose Telephone on both devices. Experimental: call audio processing can prevent delivery.'
     : 'Choose Nearby on both devices in the same room.'
     : telephone

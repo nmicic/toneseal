@@ -1,4 +1,4 @@
-# Telephone relay, audio profiles, and native CLI direction
+# Audio profiles and telephone relay
 
 The first physical call experiment uses two laptops and two phones:
 
@@ -19,13 +19,24 @@ on both devices before pressing Start:
 | Option | Tone range | Symbol duration | Maximum 128-byte packet audio |
 | --- | ---: | ---: | ---: |
 | **Nearby · faster** (default) | 600–3750 Hz | 20 ms | 4.16 s |
-| **Telephone · slower (experimental)** | 450–2812.5 Hz | 26.667 ms | 5.55 s |
+| **Telephone · slow (experimental)** | 450–2812.5 Hz | 26.667 ms | 5.55 s |
+| **Near-ultrasonic · very slow (experimental)** | 18400–19975 Hz centers | 40 ms | 8.32 s |
 
 Telephone plays the existing modem waveform at 0.75 of its normal speed. The
 receiver compensates for that rate before decoding. Packet framing, the native
 modem, encryption, peer verification, and receipts are unchanged. Each packet
 takes 33.3% longer on air; the complete exchange also includes turns, processing,
 and retries, so this percentage is not an end-to-end completion-time guarantee.
+
+Near-ultrasonic uses a separate verified JotTune Synth timeline and a matching
+mixer/low-pass receiver front end. It is intended for nearby devices held still,
+not ordinary phone calls. The same packet framing, cryptography and receipts
+apply. Physical device compatibility remains unqualified: high-frequency
+filtering, microphone clipping and room acoustics can prevent reception, and
+the tones are not guaranteed inaudible. The browser and C CLI support it; the
+enrollment showcase retains Nearby/Telephone. Test with dummy Clear text first.
+The selected idle timeout does not grow automatically; Advanced's two-minute
+option provides more time to recover lost slow turns.
 
 There is **no automatic profile negotiation or fallback**. A Nearby sender and
 a Telephone receiver are not a supported pair. To change the connection, stop
@@ -161,29 +172,8 @@ from the current audio session and is not implemented by this profile switch.
 
 ## Native Linux/macOS CLI
 
-The repository already has a C packet receiver. It was built and exercised on
-macOS arm64 with an exact 128-byte binary round trip. It also cross-compiled to
-an x86-64 Linux musl executable; that Linux binary has not been runtime-tested.
-
-```sh
-python3 build.py
-python3 build.py --cc 'zig cc -target x86_64-linux-musl' --out out/receiver-linux-x86_64
-```
-
-`build/receiver` is a diagnostic PCM receiver, not a complete encrypted client.
-The smallest useful native client should preserve browser interoperability:
-
-1. Reuse `native/portable_core.c` and add matching C framing and tone generation.
-2. Port the complete v2 session with OpenSSL EVP: P-256, HKDF, AES-GCM, separate
-   counters, replay windows, retained ciphertext, bitmap receipts, cached
-   handshake replies, and encrypted rekey.
-3. Test that session against the real JavaScript implementation over pipes,
-   including lost/reordered packets, before adding acoustic I/O.
-4. Add PortAudio capture/playback and the existing bounded turn-taking policy.
-5. Read passwords from a non-echoing terminal or stdin, not process arguments or
-   environment variables. Keep diagnostics on stderr and plaintext output
-   explicit. Test Linux with its actual crypto/audio libraries, not just a
-   cross-compiled receiver.
-
-A future native client can use installed OpenSSL and PortAudio libraries. The
-current repository does not bundle these libraries or implement that client.
+The live C client now implements Message, Password, Clear text and chat using
+installed OpenSSL 3, PortAudio and the external JotTune Synth SDK. It supports
+Nearby, Telephone and the experimental Near-ultrasonic profile. It also retains
+WAV/TL diagnostics and byte-exact text conversions. See [native CLI instructions](NATIVE-CLI.md)
+for builds, browser pairing, limits and the automated-versus-physical test scope.

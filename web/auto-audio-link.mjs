@@ -240,10 +240,10 @@ export class AutoAudioLink {
       const engine=selectEngine(await response.json());this.check(token);this.engine=engine;
     }
     const engine=this.engine;
-    let result=await this.renderJob({recordText:payloadTimeline(packet,engine.identity),engine,mode:'verify'},token);this.check(token);
+    let result=await this.renderJob({recordText:payloadTimeline(packet,engine.identity,this.profile.id),engine,mode:'verify'},token);this.check(token);
     if(result.verdict!=='valid'||!result.canonical?.length)throw Error(result.stderr||'Synth refused this packet.');
     result=await this.renderJob({recordText:new TextDecoder().decode(result.canonical),engine,mode:'verify'},token);this.check(token);
-    if(!result.verified||result.channels!==1||result.sampleRate!==48000||result.play?.clipped!=='0'||!result.pcm?.length||result.pcm.length>48000*4.2)throw Error('Synth packet verification did not complete.');
+    if(!result.verified||result.channels!==1||result.sampleRate!==48000||result.play?.clipped!=='0'||!result.pcm?.length||result.pcm.length>48000*this.profile.maxRenderSeconds)throw Error('Synth packet verification did not complete.');
     this.cache.set(key,result.pcm);
     while(this.cache.size>4)this.cache.delete(this.cache.keys().next().value);
     return result.pcm;
@@ -260,8 +260,8 @@ export class AutoAudioLink {
       this.playing=true;this.resetReceiver();
       const buffer=context.createBuffer(1,pcm.length,48000);buffer.getChannelData(0).set(Float32Array.from(pcm,value=>value/32768));
       const source=context.createBufferSource(),gain=context.createGain();source.buffer=buffer;
-      // Slow playback narrows the band without changing verified canonical PCM.
-      // The receiver applies the inverse scale before native decoding.
+      // Telephone scales Nearby PCM. Near-ultrasonic already carries its
+      // frequency map and 40 ms symbols in the verified timeline.
       source.playbackRate.value=this.profile.playbackRate;
       // Full verified amplitude. The device's own output volume remains under
       // user control; no app setting can attenuate or amplify this signal.

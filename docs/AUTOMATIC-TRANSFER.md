@@ -36,9 +36,9 @@ needed for one Unicode character. A fresh Start creates a new session; Message
 then reuses it for chat. Pairing is not saved between runs. To use the original
 one-message flow, turn off continuation in Advanced on both devices.
 
-## Nearby or Telephone
+## Audio connection
 
-**Nearby · faster** is the default audio connection. **Telephone · slower
+**Nearby · faster** is the default audio connection. **Telephone · slow
 (experimental)** is an explicit option for relaying sound through a call.
 Select it on **both** devices before Start. The setting applies to Message,
 Password, and Clear text. There is no automatic negotiation or fallback;
@@ -49,8 +49,17 @@ Telephone uses 0.75 playback speed: the tone range becomes 450–2812.5 Hz and
 symbols last 26.667 ms. Packet airtime increases by 33.3%; a maximum 128-byte
 wire packet takes about 5.55 seconds instead of 4.16 seconds. Encryption and
 the modem's packet format are unchanged. Retry waits account for the longer
-packets, while turn and echo delays remain physical elapsed time. Single
+packets, while turnaround pauses and echo guards remain physical elapsed time. Single
 transfers are limited to three minutes, and chat connections to ten minutes.
+
+**Near-ultrasonic · very slow (experimental)** uses 18.4–19.975 kHz tone centers
+and 40 ms symbols. A maximum packet takes 8.32 seconds. Select it on both nearby
+devices, keep them still, and test a dummy Clear text example first. It may be
+inaudible, but speakers, microphone filters and loud-room clipping can prevent
+reception. It is not a telephone-call profile or proof of peer identity. The
+live Tones/Spectrum views show its actual high-frequency range. The default
+idle timeout remains one minute; Advanced offers two minutes for extra repair
+time after lost turns. Stop before changing the selection; there is no fallback.
 
 For a first call test, use a laptop beside a speakerphone at each end of the
 call. Each laptop uses its own microphone and speaker; the web app does not

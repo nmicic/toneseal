@@ -97,6 +97,14 @@ try {
     await page.locator('#mode-message[aria-selected="true"]').waitFor();
     assert.equal(await page.locator('.mode-tabs button:visible').count(), 4);
     await checkLayout(page, entry.name);
+    assert.equal(await page.locator('#audio-profile').inputValue(),'nearby','Nearby remains the default');
+    assert.deepEqual(await page.locator('#audio-profile option').allTextContents(),['Nearby · faster','Telephone · slow (experimental)','Near-ultrasonic · very slow (experimental)']);
+    await page.locator('#audio-profile').selectOption('ultrasonic');
+    await page.waitForFunction(()=>document.querySelector('#audio-visual-canvas').dataset.profile==='ultrasonic');
+    assert.match(await page.locator('#audio-profile-hint').textContent(),/Experimental/);
+    await checkLayout(page,`${entry.name}/ultrasonic`);
+    await page.screenshot({path:path.join(shots,`${entry.name}-ultrasonic.png`)});
+    await page.locator('#audio-profile').selectOption('nearby');
     await page.locator('#auto-text').fill('Keep this message while I adjust settings.');
     await selectTab(page, 'advanced');
     await page.waitForFunction(() => !document.querySelector('#crypto-capability').textContent.includes('Checking'));

@@ -10,6 +10,7 @@ import {AutoTransfer} from '../web/auto-transfer.mjs';
 import {ChatTransfer} from '../web/chat-transfer.mjs';
 import {encodePayload,preamble} from '../web/communication-codec.mjs';
 import {createPCMChannel} from './native-pcm-channel.mjs';
+import {getAudioProfile} from '../web/audio-profiles.mjs';
 
 const command=process.env.TONESEAL_TRANSFER_COMMAND?JSON.parse(process.env.TONESEAL_TRANSFER_COMMAND):['build/transfer-driver'];
 if(!process.env.TONESEAL_TRANSFER_COMMAND)execFileSync('python3',['scripts/build-cli.py','--transfer-driver',...(process.env.TONESEAL_SANITIZE?['--sanitize']:[])],{stdio:'pipe'});
@@ -73,7 +74,8 @@ async function scenario(config){
   const clock=new Clock(),frames=[],links=[null,null],messages=[[],[]],deliveries=[[],[]],counts=new Map(),errors=[];
   const initial='  é🔑\n\u0000exact bytes  ',expected=[[],[hex(encoder.encode(initial))]];
   let native,js,nativeTimer,nativeBusy=false,nativeState={active:true},started=false,burst=false,closing=false,confirmed=false,failure;
-  const chat=config.mode==='chat',nativeSender=config.nativeSender!==false,profile=config.telephone?'telephone':'nearby';
+  const chat=config.mode==='chat',nativeSender=config.nativeSender!==false,profile=config.profile??(config.telephone?'telephone':'nearby');
+  const audioProfile=getAudioProfile(profile);
   const pcm=process.env.TONESEAL_TRANSFER_PCM?await createPCMChannel(profile):null;
   const sender=nativeSender?0:1,receiver=1-sender;
   expected[sender]=[];expected[receiver]=[hex(encoder.encode(initial))];
@@ -96,7 +98,7 @@ async function scenario(config){
       await pause(config.prepareMs??180);if(!this.running)throw new DOMException('Stopped','AbortError');
       if(pcm)packet=await clock.track(pcm.transmit(side,packet));
       const kind=classify(packet,side),key=`${side}/${kind}`,ordinal=(counts.get(key)||0)+1;counts.set(key,ordinal);
-      const duration=(80+(preamble.length+encodePayload(packet).length)*20)*(config.telephone?4/3:1)*(1+(config.driftPpm??0)*(side?1:-1)/1e6);
+      const duration=(80+(preamble.length+encodePayload(packet).length)*20)*audioProfile.timingScale*(1+(config.driftPpm??0)*(side?1:-1)/1e6);
       const peer=links[1-side],frame={side,kind,ordinal,hex:hex(packet),start:clock.now,end:clock.now+duration,dropped:Boolean(config.drop?.({side,kind,ordinal,at:clock.now})),collided:false,ready:Boolean(peer?.running&&!peer.playing&&peer.allowedAfter<=clock.now)};
       frames.push(frame);this.playing=true;
       for(const other of frames)if(other!==frame&&other.side!==side&&other.end>frame.start&&other.start<frame.end){frame.collided=true;other.collided=true;}
@@ -144,7 +146,7 @@ async function scenario(config){
   }
   clock.install();
   try{
-    native=new Native([config.crypto??'p256',config.mode,nativeSender?'send':'receive',String(Number(Boolean(config.verify))),String(Number(Boolean(config.autoClose))),nativeSender?hex(encoder.encode(initial)):'',String(config.timeout??60000),String(Number(Boolean(config.telephone)))],clock);
+    native=new Native([config.crypto??'p256',config.mode,nativeSender?'send':'receive',String(Number(Boolean(config.verify))),String(Number(Boolean(config.autoClose))),nativeSender?hex(encoder.encode(initial)):'',String(config.timeout??60000),String(['nearby','telephone','ultrasonic'].indexOf(profile))],clock);
     link(0,{onPackets:packets=>{for(const packet of packets)request('receive',hex(packet));}});
     const Constructor=chat?ChatTransfer:AutoTransfer;
     js=new Constructor({now:()=>clock.now,random:()=>.5,onChange:()=>maybe(),onMessage:record=>{received(1,record.text);maybe();},onDelivery:record=>{deliveries[1].push(record.counter);maybe();},transportFactory:callbacks=>link(1,callbacks)});
@@ -192,6 +194,12 @@ configs.push(
   {name:'chat-lost-final-C-sender',mode:'chat',loseFinal:true,drop:({kind})=>kind==='final'},
   {name:'chat-lost-final-C-receiver',mode:'chat',nativeSender:false,loseFinal:true,drop:({kind})=>kind==='final'},
   {name:'telephone-chat',mode:'chat',crypto:'x25519',telephone:true},
+  {name:'ultrasonic-password',mode:'password',profile:'ultrasonic',verify:true},
+  {name:'ultrasonic-clear',mode:'clear',nativeSender:false,profile:'ultrasonic'},
+  {name:'ultrasonic-chat',mode:'chat',profile:'ultrasonic',crypto:'x25519',maxPayload:true},
+  {name:'ultrasonic-chat-C-receiver',mode:'chat',nativeSender:false,profile:'ultrasonic'},
+  {name:'ultrasonic-loss-recovery',mode:'chat',profile:'ultrasonic',timeout:120000,drop:({kind,ordinal})=>['data','poll','response'].includes(kind)&&ordinal===2},
+  {name:'ultrasonic-idle-bounds-loss-burst',mode:'chat',profile:'ultrasonic',failure:true,drop:({kind,ordinal})=>['data','poll','response'].includes(kind)&&ordinal===2},
   {name:'chat-eight-outstanding',mode:'chat',burst:7,maxPayload:true},
   {name:'clear-short-idle-after-receipt',mode:'clear',timeout:10000,drop:({kind})=>kind==='fin'},
   {name:'both-senders-clear',mode:'clear',bothSend:true,failure:true},
