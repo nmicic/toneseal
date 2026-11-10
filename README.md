@@ -117,8 +117,24 @@ Run send and receive on different devices. See [native build, flow and automatio
 instructions](docs/NATIVE-CLI.md) for required system packages, matching browser
 settings, chat, byte-exact `toneseal text to-tl/from-tl/to-wav/from-wav`
 conversions, JSON events and the test scope. Physical
-CLI-to-phone/browser testing and native mobile apps remain pending. The retained
+CLI-to-phone/browser testing remains pending; native mobile apps are a separate
+project/release. The retained
 [JavaScript file CLI](LEGACY.md) is a separate cleartext diagnostic.
+
+All four file conversions support `--profile nearby` (standard/default),
+`--profile telephone` (phone) and `--profile ultrasonic` (near-ultrasonic).
+New TL exports use `# jottune-tl 1 1` for every profile, with their physical
+tones/timing embedded. Use the same profile when decoding. For example:
+
+```sh
+printf '%s' 'A dummy message' | build/toneseal text to-tl --profile telephone --output example-phone.tl
+build/toneseal text from-tl --profile telephone --input example-phone.tl
+```
+
+These file conversions are **unencrypted**. Use live Password mode with peer
+verification for an encrypted secret exchange. The
+[conversion guide](docs/NATIVE-CLI.md#toneseal-text-conversions) includes byte-exact
+round trips for every profile, version meanings, file limits and troubleshooting.
 
 ## Checks
 

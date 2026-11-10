@@ -79,3 +79,20 @@ cryptographic audit. Native mobile apps and full X.509 PKI can ship separately.
 The C CLI's physical laptop/browser/phone acceptance remains a separate gate
 from its automated crypto, timed-controller, synth/decoder and backend checks;
 it does not need to hold this browser beta.
+
+## Public beta scope
+
+| Component | Release description | Remaining acceptance |
+| --- | --- | --- |
+| Browser app | Experimental beta; Message, Password, Clear text and chat. | Record real device/browser versions and tested pairs. |
+| Native Linux/macOS CLI | Experimental client and byte-exact TL/WAV conversions. | Physical CLI-to-browser/phone audio testing. |
+| Nearby profile | Default for same-room devices. | Device/environment-specific reliability. |
+| Telephone / Near-ultrasonic | Explicit experimental choices in the app and CLI. | Actual call paths / high-frequency hardware support. |
+| Native iOS/Android apps | Separate project/release; not part of this repository's beta. | Separate device and distribution acceptance. |
+
+Before tagging, confirm the pinned synth revision is publicly fetchable and
+the GitHub Linux/macOS CI runs are green. Build the browser and CLI against that
+revision, check `toneseal text --help` and `capabilities`, and run the documented
+three-profile TL/WAV round trips from fresh output filenames. All emitted TL
+files must declare the supported `1 1` document/engine requirements. Keep those
+numbers separate from the program version and physical sound profile.

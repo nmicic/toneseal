@@ -10,6 +10,8 @@
 
 typedef struct { int16_t *samples; size_t frames; unsigned rate; uint64_t hash; } ts_pcm;
 #define TS_TIMELINE_MAX 200000u
+#define TS_TL_VERSION 1u
+#define TS_TL_ENGINE_VERSION 1u
 typedef struct {
     uint64_t index,next;
     unsigned step,den;

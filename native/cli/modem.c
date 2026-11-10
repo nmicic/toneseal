@@ -62,28 +62,38 @@ static int append(char *out, size_t cap, size_t *used, const char *format, ...) 
     if (n<0 || (size_t)n>=cap-*used) return 0;
     *used+=(size_t)n; return 1;
 }
-int ts_modem_timeline_profile(const uint8_t *payload, size_t n, uint16_t sender, int profile, char **out, size_t *len) {
+static unsigned long long timeline_ns(unsigned long long ms, int profile, int physical) {
+    if (profile==TS_AUDIO_ULTRASONIC) return ms*2000000;
+    /* Round up to retain exact 48 kHz sample positions for thirds of a ns. */
+    if (profile==TS_AUDIO_TELEPHONE && physical) return (ms*4000000+2)/3;
+    return ms*1000000;
+}
+static int packet_timeline(const uint8_t *payload, size_t n, uint16_t sender, int profile, int physical, char **out, size_t *len) {
     static const uint8_t preamble[8]={0,255,85,170,51,204,105,150};
     uint8_t glyphs[204]; char engine[160],*text; size_t count,used=0,i; unsigned voice;
-    const size_t cap=160000; unsigned scale=profile==TS_AUDIO_ULTRASONIC?2:1;
+    const size_t cap=160000;
     if (n>128 || !ts_audio_profile_valid(profile)) return 0;
     memcpy(glyphs,preamble,8); count=ts_modem_frame(payload,n,sender,glyphs+8)+8;
     fms_engine_line(engine,sizeof(engine));
     text=malloc(cap); if (!text) return 0;
     if (!append(text,cap,&used,"timeline draft1\nengine %s\nfs 48000\nlength_ns %llu\nstreams message\npatch sine 0 65536 300 0 0 0 1 1 0 1\npatch sine 1 65536 0 0 0 0 1 1 0 1\n",
-                engine,(unsigned long long)(80+count*20)*1000000*scale)) goto failed;
+                engine,timeline_ns(80+count*20,profile,physical))) goto failed;
     for (voice=0;voice<4;++voice) if (!append(text,cap,&used,"voice %u sine\n",voice)) goto failed;
     for (i=0;i<count;++i) {
-        unsigned long long start=(40+(unsigned long long)i*20)*1000000*scale;
+        unsigned long long start=timeline_ns(40+i*20,profile,physical),end=timeline_ns(58+i*20,profile,physical);
         for (voice=0;voice<4;++voice) {
             unsigned tone=voice*16+((glyphs[i]>>4)^mul(glyphs[i]&15,voice));
-            unsigned frequency=profile==TS_AUDIO_ULTRASONIC?18400+25*tone:600+50*tone;
-            if (!append(text,cap,&used,"%llu message %u on %u 32767\n%llu message %u off\n",start,voice,frequency*1000,start+18000000*scale,voice)) goto failed;
+            unsigned frequency=profile==TS_AUDIO_ULTRASONIC?18400000+25000*tone:
+                profile==TS_AUDIO_TELEPHONE && physical?450000+37500*tone:600000+50000*tone;
+            if (!append(text,cap,&used,"%llu message %u on %u 32767\n%llu message %u off\n",start,voice,frequency,end,voice)) goto failed;
         }
     }
     *out=text; *len=used; return 1;
 failed:
     free(text); return 0;
+}
+int ts_modem_timeline_profile(const uint8_t *payload, size_t n, uint16_t sender, int profile, char **out, size_t *len) {
+    return packet_timeline(payload,n,sender,profile,0,out,len);
 }
 int ts_modem_timeline(const uint8_t *payload, size_t n, uint16_t sender, char **out, size_t *len) {
     return ts_modem_timeline_profile(payload,n,sender,TS_AUDIO_NEARBY,out,len);
@@ -113,9 +123,9 @@ static int render_timeline(const char *timeline, size_t len, ts_pcm *out, char *
         position+=written;
     }
     if (fms_player_clipped(player)) { snprintf(error,cap,"Synth waveform clipped."); goto done; }
-    /* Replay the musical body, independently of descriptive metadata. The
-     * generated packet export is body-only too; from-tl decodes text, rather
-     * than editing or re-exporting an imported portable document. */
+    /* Replay the musical body independently of descriptive metadata. File
+     * export wraps this verified body in a portable header; from-tl decodes
+     * text, rather than editing or re-exporting an imported TL document. */
     out->hash=fms_player_hash(player); record_len=fms_player_record_body_text(player,NULL,0);
     if (!record_len || record_len>TS_TIMELINE_MAX+1u) { snprintf(error,cap,"Canonical synth record is unavailable."); goto done; }
     record=malloc(record_len); if (!record || fms_player_record_body_text(player,record,record_len)!=record_len) goto done;
@@ -133,25 +143,37 @@ done:
     if (!ok) { ts_pcm_free(out); if (cancel && *cancel) snprintf(error,cap,"Cancelled."); else if (!error[0]) snprintf(error,cap,"Native packet rendering failed."); }
     return ok;
 }
-static int render_packet(const ts_packet *packet, int profile, ts_pcm *out, char **canonical, size_t *canonical_len,
+static int render_packet(const ts_packet *packet, int profile, int physical, ts_pcm *out, char **canonical, size_t *canonical_len,
                          volatile sig_atomic_t *cancel, char *error, size_t cap) {
     char *timeline=NULL; size_t len=0; int ok;
     memset(out,0,sizeof(*out));
-    if (!ts_modem_timeline_profile(packet->bytes,packet->len,0,profile,&timeline,&len)) { snprintf(error,cap,"Cannot prepare the packet timeline/profile."); return 0; }
+    if (!packet_timeline(packet->bytes,packet->len,0,profile,physical,&timeline,&len)) { snprintf(error,cap,"Cannot prepare the packet timeline/profile."); return 0; }
     ok=render_timeline(timeline,len,out,canonical,canonical_len,cancel,error,cap); free(timeline); return ok;
 }
 int ts_modem_render(const ts_packet *packet, ts_pcm *out, volatile sig_atomic_t *cancel, char *error, size_t cap) {
     return ts_modem_render_profile(packet,TS_AUDIO_NEARBY,out,cancel,error,cap);
 }
 int ts_modem_render_profile(const ts_packet *packet, int profile, ts_pcm *out, volatile sig_atomic_t *cancel, char *error, size_t cap) {
-    return render_packet(packet,profile,out,NULL,NULL,cancel,error,cap);
+    return render_packet(packet,profile,0,out,NULL,NULL,cancel,error,cap);
 }
 int ts_modem_record(const ts_packet *packet, char **out, size_t *len, volatile sig_atomic_t *cancel, char *error, size_t cap) {
     return ts_modem_record_profile(packet,TS_AUDIO_NEARBY,out,len,cancel,error,cap);
 }
 int ts_modem_record_profile(const ts_packet *packet, int profile, char **out, size_t *len, volatile sig_atomic_t *cancel, char *error, size_t cap) {
-    ts_pcm pcm={0}; int ok;
-    *out=NULL; *len=0; ok=render_packet(packet,profile,&pcm,out,len,cancel,error,cap); ts_pcm_free(&pcm); return ok;
+    ts_pcm pcm={0}; char *body=NULL,header[160]; size_t body_len=0; int n,ok;
+    *out=NULL; *len=0;
+    /* TL files contain their physical tones/timing, including Telephone. Live
+     * and WAV playback retain the existing verified-PCM scaling path. */
+    ok=render_packet(packet,profile,1,&pcm,&body,&body_len,cancel,error,cap); ts_pcm_free(&pcm);
+    if (!ok) return 0;
+    n=snprintf(header,sizeof(header),"# jottune-tl %u %u\n# {\"title\":\"ToneSeal %s text packet\"}\n# end-jottune-tl\n",
+        TS_TL_VERSION,TS_TL_ENGINE_VERSION,profile==TS_AUDIO_ULTRASONIC?"Near-ultrasonic":profile==TS_AUDIO_TELEPHONE?"Telephone":"Nearby");
+    if (n<0 || (size_t)n>=sizeof(header) || body_len+(size_t)n>TS_TIMELINE_MAX || !(*out=malloc(body_len+(size_t)n+1))) {
+        snprintf(error,cap,"Cannot prepare the portable TL document."); ok=0;
+    } else {
+        memcpy(*out,header,(size_t)n); memcpy(*out+n,body,body_len+1); *len=body_len+(size_t)n;
+    }
+    OPENSSL_clear_free(body,body_len+1); return ok;
 }
 int ts_timeline_read(const char *name, ts_pcm *out, volatile sig_atomic_t *cancel, char *error, size_t cap) {
     FILE *f=!strcmp(name,"-")?stdin:fopen(name,"rb"); char *text=NULL; size_t len=0; int ok=0;

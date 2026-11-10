@@ -12,7 +12,7 @@ Telephone remains experimental; synthesized PCM does not prove a phone call.
 
 ## Build
 
-Requirements: a C11 compiler, make, Python 3.10+, pkg-config, OpenSSL **3.x**
+Requirements: Git, a C11 compiler, make, Python 3.10+, pkg-config, OpenSSL **3.x**
 development libraries and PortAudio development libraries. Dependencies are
 installed separately; none are vendored. Generated SDK/client products go into
 ToneSeal's ignored `build/` directory.
@@ -24,7 +24,7 @@ enforce the new TL/engine compatibility requirements.
 Ubuntu/Debian:
 
 ```sh
-sudo apt-get install build-essential python3 pkg-config libssl-dev portaudio19-dev
+sudo apt-get install git build-essential python3 pkg-config libssl-dev portaudio19-dev
 ```
 
 macOS with Homebrew and Xcode command-line tools:
@@ -38,7 +38,7 @@ From the ToneSeal checkout:
 
 ```sh
 git clone https://github.com/chimepond/jottune-synth.git ../jottune-synth
-git -C ../jottune-synth checkout d2997c99c01f5a1d75af6c2c68454a99d02356d6
+git -C ../jottune-synth checkout 9089096fc23d8c2cd25f6777ab2c73865c83cb2d
 python3 scripts/build-cli.py --synth-root ../jottune-synth
 build/toneseal --help
 ```
@@ -82,7 +82,7 @@ not identity. There is no automatic profile fallback.
 | `chat --send` / `chat` | Initiate / receive a persistent bidirectional chat. |
 | `devices --json` | List PortAudio IDs and defaults; no capture. |
 | `audio-probe --duration 2` | Report capture levels briefly; no recording. |
-| `text to-tl` / `text from-tl` | ToneSeal text to/from a standard JotTune sound timeline. |
+| `text to-tl` / `text from-tl` | Text to/from portable TL; all three audio profiles. |
 | `text to-wav` / `text from-wav` | ToneSeal text to/from a sound WAV. |
 | `encode` / `decode` | WAV diagnostics, described below. |
 | `capabilities` | Machine-readable commands, events, modes and limits. |
@@ -187,9 +187,42 @@ fingerprints does not authenticate automatically.
 ## ToneSeal text conversions
 
 `toneseal text` is a dedicated text-over-sound command group. It encodes ToneSeal
-text packets into standard JotTune Synth timelines or WAVs, and recovers their
+text packets into portable JotTune Synth timelines or WAVs, and recovers their
 text through the audio decoder. General synth/music conversion belongs to the
 synth's own tools; arbitrary music is not interpreted as text.
+
+**File conversions are unencrypted.** For an encrypted secret exchange, use
+`send --mode password --verify` and `receive --mode password --verify` on the
+two devices. Converting a file does not pair devices or obtain delivery receipts.
+
+### Choose an audio profile
+
+All four actions accept the same `--profile`. Nearby is the standard/default;
+"phone" means Telephone. Use the exact CLI identifiers below.
+
+| Browser name | CLI identifier | Tone centers | Maximum packet sound |
+| --- | --- | --- | --- |
+| Nearby · faster | `nearby` | 600–3750 Hz | 4.16 s |
+| Telephone · slow (experimental) | `telephone` | 450–2812.5 Hz | 5.55 s |
+| Near-ultrasonic · very slow (experimental) | `ultrasonic` | 18.4–19.975 kHz | 8.32 s |
+
+These are maximum 128-byte packet durations, not complete encrypted-transfer
+times. Each profile supports `to-tl`, `from-tl`, `to-wav` and `from-wav`. Supply
+the **same profile when encoding and decoding**; detection/fallback is not
+automatic. A descriptive TL title does not select a decoder profile.
+
+TL always uses mono **48 kHz**. The physical tones and timing are in the file,
+including Telephone: ordinary synth playback needs no extra speed adjustment.
+WAV output supports `--rate 44100` or `--rate 48000` (default). `--rate` applies
+only to `to-wav`; readers use the rate stored in the input. Live/WAV Telephone
+generation retains verified Nearby PCM with playback scaling, while the TL file
+expresses the Telephone frequencies/timing directly. Both recover the same text.
+
+Telephone-call processing and high-frequency hardware filtering can prevent
+delivery. Near-ultrasonic is for nearby stationary devices; it may be audible.
+Test with dummy content first. See [audio profiles](TELEPHONE.md).
+
+### First byte-exact round trip
 
 For a UTF-8 `message.txt` containing **1–96 bytes**, including any original spaces,
 newlines, BOM or NUL bytes:
@@ -204,10 +237,58 @@ build/toneseal text from-wav --input message.wav --output roundtrip-wav.txt
 cmp message.txt roundtrip-wav.txt
 ```
 
-Both comparisons must be byte-identical. Files/pipes are neither trimmed nor
-normalized, and no output newline is added. Existing output files are refused;
-new files have mode 0600. TTY text is escaped for display; use a file, pipe or
-explicit `--output` for raw bytes.
+Successful `cmp` prints nothing and exits 0: the recovered bytes must be identical.
+Files/pipes are neither trimmed nor normalized, and no output newline is added.
+The limit counts UTF-8 **bytes**, not characters; arbitrary binary files and large
+file transfer are unsupported. `--output` refuses existing files and creates new
+ones as 0600. Shell redirection follows the shell's permissions/overwrite rules.
+TTY text is escaped for display; use a file/pipe for raw recovered bytes.
+
+To exercise all profiles with the same input and separate output files:
+
+```sh
+for audio_profile in nearby telephone ultrasonic; do
+  build/toneseal text to-tl --profile "$audio_profile" --input message.txt --output "message-$audio_profile.tl"
+  build/toneseal text from-tl --profile "$audio_profile" --input "message-$audio_profile.tl" --output "roundtrip-$audio_profile-tl.txt"
+  cmp message.txt "roundtrip-$audio_profile-tl.txt"
+  build/toneseal text to-wav --profile "$audio_profile" --rate 44100 --input message.txt --output "message-$audio_profile.wav"
+  build/toneseal text from-wav --profile "$audio_profile" --input "message-$audio_profile.wav" --output "roundtrip-$audio_profile-wav.txt"
+  cmp message.txt "roundtrip-$audio_profile-wav.txt"
+done
+```
+
+Choose new filenames before repeating these examples. The CLI deliberately does
+not overwrite earlier results.
+
+### TL versions and metadata
+
+Every `to-tl` export now begins with the portable header, for example:
+
+```text
+# jottune-tl 1 1
+# {"title":"ToneSeal Nearby text packet"}
+# end-jottune-tl
+```
+
+The canonical music body, exact engine descriptor and saved waveform hash follow.
+The header is the same version for **all three profiles**; the title names the
+profile but never includes the message, author or model attribution.
+
+| Value | Meaning |
+| --- | --- |
+| `toneseal --version`: `0.1.0` experimental beta | Program/package version. |
+| First `1` in `# jottune-tl 1 1` | Required TL document/grammar compatibility. |
+| Second `1` | Required synth-engine compatibility. |
+| `--profile nearby\|telephone\|ultrasonic` | Physical sound profile; independent of those versions. |
+| `--rate 44100\|48000` | WAV sample rate; independent of those versions. |
+
+An optional header in older input is accepted; headerless legacy TL remains
+readable. Unsupported newer requirements and malformed framing fail before text
+is released. Do not edit version numbers to force a file through an older reader.
+Version `1 1` does not replace the exact native `engine` descriptor/table check.
+Keep the header at the first line: do not prepend comments or a byte-order mark.
+LF and CRLF line endings are accepted. The TL document itself must have no BOM
+or NUL, although the text recovered from its sound can contain those bytes.
 
 `to-tl` defaults to stdin/stdout and exports a complete canonical TL with its
 saved waveform hash. `from-tl` imports with the synth's production reader,
@@ -219,20 +300,18 @@ mono 48 kHz and twelve seconds. Truncated, malformed and hash-mismatched records
 fail without creating a decoded output file.
 
 ```sh
-printf '%s' 'A dummy message' | build/toneseal text to-tl > example.tl
+printf '%s' 'A dummy message' | build/toneseal text to-tl --output example.tl
 build/toneseal text from-tl --input example.tl
 cat example.tl | build/toneseal text from-tl --input -
 build/toneseal text --help
 ```
 
-WAV encoding requires a new `--output FILE`. `--rate 44100|48000` and
-`--profile nearby|telephone|ultrasonic` apply to WAVs; use the matching profile for decoding.
-TL supports Nearby and Near-ultrasonic, always at 48 kHz; specify matching
-`--profile ultrasonic` for both TL conversions. Telephone uses Nearby TL with
-physical playback scaling. Both inverse commands accept
+WAV encoding requires a new `--output FILE`. Both inverse commands accept
 `--input -` for stdin and default to stdout. `--json` exposes metadata/events;
 `to-tl --json` requires a separate output file to keep its stdout valid JSON.
-`capabilities` lists all four actions under `textConversions`.
+`capabilities` lists all four actions, their TL/WAV profiles and the supported
+`tlVersion`/`engineVersion` under `textConversions`. JSON encoding events include
+`audioProfile`; TL events also include both compatibility versions.
 
 `from-tl` accepts legacy headerless timelines and the optional upstream
 `# jottune-tl 1 1` document header. The native synth checks compatibility,
@@ -241,11 +320,25 @@ is released. ToneSeal's 200,000-byte limit remains stricter than the general
 portable document limit. Descriptive JSON stays opaque to this audio decoder;
 it never supplies recovered text or changes the sound. This conversion produces
 text, not an edited/re-exported TL document. Internal replay and generated packet
-TL use the explicit musical-body API, without inventing song metadata.
+TL use the explicit musical-body API; generated files wrap that body in the
+versioned descriptive header above. Editing metadata leaves the saved PCM hash
+unchanged; a checksum of the complete file changes. Metadata is not proof of
+authorship, peer identity or delivery.
 
-These file conversions carry **cleartext** and imply no pairing or delivery
-receipt. Transfer IDs are freshly randomized, so two encodings of the same
+Transfer IDs are freshly randomized, so two encodings of the same
 text can have different TL/WAV bytes while recovering identical text.
+
+### Troubleshooting conversions
+
+| Symptom | Next step |
+| --- | --- |
+| No packet found | Match `--profile` to the encoder and check the file contains ToneSeal data, rather than general music. |
+| Only opaque/control records found | File conversion cannot recover these as text; encrypted records are handled inside their live session. |
+| Unsupported TL/engine requirement | Update the synth SDK/reader; keep the declared requirements intact. |
+| Exact engine mismatch | Use the matching JotTune renderer/table build; the header alone cannot establish compatibility. |
+| Output file already exists | Choose another `--output` filename. |
+| Input too long | Shorten to 96 UTF-8 bytes; nothing is truncated automatically. |
+| Invalid command/options | Use `toneseal text --help` for conversion-specific flags. |
 
 ## WAV diagnostics and compatibility
 

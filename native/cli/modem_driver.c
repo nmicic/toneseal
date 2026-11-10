@@ -35,13 +35,19 @@ int main(int argc, char **argv) {
         if (!unhex(argv[2],p.bytes,&p.len) || !ts_modem_timeline_profile(p.bytes,p.len,0,argc==4?audio_profile(argv[3]):TS_AUDIO_NEARBY,&tl,&len)) return 64;
         fwrite(tl,1,len,stdout); free(tl); return ferror(stdout)?74:0;
     }
+    if (argc==4 && !strcmp(argv[1],"record")) {
+        char *tl=NULL; size_t len=0;
+        if (!unhex(argv[2],p.bytes,&p.len) || !ts_modem_record_profile(&p,audio_profile(argv[3]),&tl,&len,NULL,error,sizeof(error))) return 1;
+        fwrite(tl,1,len,stdout); free(tl); return ferror(stdout)?74:0;
+    }
     if (argc==6 && !strcmp(argv[1],"render")) {
         if (!unhex(argv[2],p.bytes,&p.len)) return 64;
         ok=ts_modem_render_profile(&p,audio_profile(argv[5]),&pcm,NULL,error,sizeof(error)) && ts_pcm_profile(&pcm,(unsigned)atoi(argv[4]),audio_profile(argv[5]),&physical) && ts_wav_write(argv[3],&physical,error,sizeof(error));
         if (ok) printf("{\"frames\":%zu,\"source_frames\":%zu,\"hash\":\"%016llx\"}\n",physical.frames,pcm.frames,(unsigned long long)pcm.hash);
-    } else if (argc==4 && !strcmp(argv[1],"render-tl")) {
-        ok=ts_timeline_read(argv[2],&pcm,NULL,error,sizeof(error)) && ts_wav_write(argv[3],&pcm,error,sizeof(error));
-        if (ok) printf("{\"frames\":%zu,\"hash\":\"%016llx\"}\n",pcm.frames,(unsigned long long)pcm.hash);
+    } else if ((argc==4 || argc==5) && !strcmp(argv[1],"render-tl")) {
+        ok=ts_timeline_read(argv[2],&pcm,NULL,error,sizeof(error)) &&
+            ts_pcm_profile(&pcm,argc==5?(unsigned)atoi(argv[4]):48000,TS_AUDIO_NEARBY,&physical) && ts_wav_write(argv[3],&physical,error,sizeof(error));
+        if (ok) printf("{\"frames\":%zu,\"hash\":\"%016llx\"}\n",physical.frames,(unsigned long long)pcm.hash);
     } else if (argc==4 && !strcmp(argv[1],"decode")) {
         ac_receiver *receiver=malloc(sizeof(*receiver)); ts_resampler resampler; size_t i,count=0;
         if (!receiver) return 70;

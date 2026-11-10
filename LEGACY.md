@@ -3,6 +3,11 @@
 For the live encrypted C client, use [the native CLI guide](docs/NATIVE-CLI.md).
 This page describes the retained JavaScript diagnostic tool.
 
+For new integrations, use `build/toneseal text to-tl/from-tl/to-wav/from-wav`.
+The C CLI supports all three profiles and file/stdin input. This older diagnostic
+is **Nearby-only**; it does not implement Telephone or Near-ultrasonic, encrypted
+sessions, or TL-to-text recovery.
+
 The original file experiment is retained as a diagnostic tool. It converts text
 into a JotTune timeline and WAV, and decodes a recorded WAV with ToneSeal's native
 C receiver. It is clear text, unauthenticated and has no pairing or delivery
@@ -26,6 +31,12 @@ copied into ToneSeal. The output directory must be new. Encoding checks the
 canonical replay before reporting success and never overwrites an existing
 output directory. The receiver does not read the sender's timeline or expected
 text. `--decoder PATH` selects an existing receiver executable.
+
+Use the portable-TL-capable harness from the pinned synth revision in the
+[native build guide](docs/NATIVE-CLI.md#build). New `message.tl` files begin with
+`# jottune-tl 1 1` and retain a saved PCM hash. These are TL/engine compatibility
+requirements, not a Telephone/ultrasonic setting. Header metadata never contains
+the message text, and legacy JSON output names the Nearby profile and versions.
 
 The decoder accepts mono/stereo PCM16 WAV at 44.1 or 48 kHz, up to 20 seconds and
 4 MiB. Stereo uses the first channel; 44.1 kHz samples are explicitly resampled.

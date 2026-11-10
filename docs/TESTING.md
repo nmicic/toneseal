@@ -73,6 +73,13 @@ audio. Native file tests separately cover header-bearing text recovery, exact
 PCM equality, malformed/version/size refusal and saved-hash failure. These
 checks use upstream document helpers; ToneSeal does not vendor another parser.
 
+The CLI file matrix also checks every exported profile starts with the supported
+`1 1` header, reports its profile/versions in JSON, and decodes identically from
+TL, legacy headerless body and 44.1/48 kHz rendered WAV. Telephone TL embeds its
+physical frequencies/timing. The optional native/browser PCM suite renders these
+files in both synths, compares actual PCM and crosses both receivers. Live/WAV
+Telephone waveform comparisons remain separate, guarding against double scaling.
+
 The experimental Near-ultrasonic profile is included in browser/C waveform
 comparisons at 44.1/48 kHz, full encrypted Password/chat PCM transfers and
 byte-exact text/TL/WAV round trips. Its mixer/filter constants are regenerated

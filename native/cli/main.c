@@ -57,6 +57,9 @@ static int write_bytes(int fd, const uint8_t *p, size_t n) {
     }
     return !n;
 }
+static const char *profile_id(int profile) {
+    return profile==TS_AUDIO_ULTRASONIC?"ultrasonic":profile==TS_AUDIO_TELEPHONE?"telephone":"nearby";
+}
 static void help(void) {
     puts("ToneSeal 0.1.0 experimental beta — native C audio client\n"
          "\nUsage: toneseal COMMAND [options]\n"
@@ -94,13 +97,13 @@ static void help(void) {
          "\nPassword receive stays masked unless you explicitly select --output or\n"
          "type /reveal. No clipboard is read/written. Input is never a --text argument.\n"
          "Files/piped input preserve exact UTF-8 bytes, including trailing newlines.\n"
-         "Use printf '%s' for a password without an added newline. Maximum: 96 bytes.\n"
+         "Password mode prompts with terminal echo disabled. Maximum: 96 UTF-8 bytes.\n"
          "Simple mode encrypts but does not authenticate the initial peer.\n"
          "--verify requires an independent trusted fingerprint comparison on both sides.");
 }
 static void text_help(void) {
     puts("Usage: toneseal text ACTION [options]\n"
-         "  to-tl     Encode UTF-8 text as a canonical ToneSeal sound timeline\n"
+         "  to-tl     Encode UTF-8 text as a portable ToneSeal sound timeline\n"
          "  from-tl   Render a ToneSeal timeline and recover its text from sound\n"
          "  to-wav    Encode UTF-8 text as a ToneSeal sound WAV\n"
          "  from-wav  Recover ToneSeal text from a WAV recording\n"
@@ -108,9 +111,14 @@ static void text_help(void) {
          "--output FILE|-   New 0600 output file; to-wav requires a file.\n"
          "                  TL/text default to stdout; redirected text is byte-exact.\n"
          "--json            Metadata/events; to-tl needs an output file in JSON mode.\n"
-         "--profile nearby|telephone|ultrasonic --rate 44100|48000  WAV options.\n"
-         "Match --profile when decoding. TL supports nearby/ultrasonic at 48 kHz.\n"
-         "Ultrasonic is experimental near-ultrasound (18.4-19.975 kHz), very slow.\n"
+         "--profile nearby|telephone|ultrasonic  Applies to all four actions.\n"
+         "  nearby      Nearby / standard: 600-3750 Hz, faster (default).\n"
+         "  telephone   Telephone / phone: 450-2812.5 Hz, slow, experimental.\n"
+         "  ultrasonic  Near-ultrasonic: 18.4-19.975 kHz, very slow, experimental.\n"
+         "Use the same --profile for encoding and decoding; no automatic detection.\n"
+         "--rate 44100|48000  to-wav only (default 48000). TL always uses 48000.\n"
+         "Every exported TL starts with # jottune-tl 1 1 (TL / engine requirements).\n"
+         "Those versions are the same for all three audio profiles. Legacy TL is read too.\n"
          "\nThese are ToneSeal text-over-sound conversions, 1-96 UTF-8 bytes.\n"
          "They do not interpret arbitrary synth music as text or provide encryption.\n"
          "Files/pipes preserve spaces, newlines and NUL bytes; nothing is trimmed.\n"
@@ -190,7 +198,6 @@ static int parse(int argc, char **argv, options *o) {
         (o->file==FILE_TO_WAV && (!o->output || !strcmp(o->output,"-"))) ||
         ((o->file==FILE_FROM_WAV || o->file==FILE_FROM_TL) && !o->input) ||
         (o->file==FILE_TO_TL && o->json && !o->output) ||
-        ((o->file==FILE_TO_TL || o->file==FILE_FROM_TL) && o->profile==TS_AUDIO_TELEPHONE) ||
         (o->send && strcmp(o->command,"chat")) || (o->packets && o->file!=FILE_FROM_WAV) ||
         (o->verify && o->mode==TS_MODE_CLEAR) || (!strcmp(o->command,"receive") && o->input) ||
         (!strcmp(o->command,"chat") && !o->send && o->input) ||
@@ -277,7 +284,7 @@ static int timeline_output(options *o, const ts_packet *packet, char *error, siz
         (!ctx.output_created || fsync(ctx.output_fd)==0)) { ctx.output_written=1; ok=1; }
     if (ctx.output_created) { if (close(ctx.output_fd)) ok=0; if (!ok) unlink(o->output); }
     if (!ok) snprintf(error,cap,"Timeline output could not be written to its new file/stdout.");
-    else if (o->json) printf("{\"schemaVersion\":1,\"type\":\"encoded\",\"format\":\"tl\",\"encrypted\":false,\"timelineBytes\":%zu,\"rate\":48000}\n",len);
+    else if (o->json) printf("{\"schemaVersion\":1,\"type\":\"encoded\",\"format\":\"tl\",\"encrypted\":false,\"timelineBytes\":%zu,\"rate\":48000,\"audioProfile\":\"%s\",\"tlVersion\":%u,\"engineVersion\":%u}\n",len,profile_id(o->profile),TS_TL_VERSION,TS_TL_ENGINE_VERSION);
     else fputs("ToneSeal cleartext TL written; no pairing or receipt is implied.\n",stderr);
     OPENSSL_clear_free(timeline,len+1); return ok;
 }
@@ -289,7 +296,7 @@ static int file_command(options *o) {
         else if (o->file==FILE_TO_TL) { if (timeline_output(o,&p,error,sizeof(error))) result=0; }
         else if (ts_modem_render_profile(&p,o->profile,&pcm,&stop_signal,error,sizeof(error)) &&
             ts_pcm_profile(&pcm,o->rate,o->profile,&physical) && ts_wav_write(o->output,&physical,error,sizeof(error))) {
-            if (o->json) printf("{\"schemaVersion\":1,\"type\":\"encoded\",\"format\":\"wav\",\"encrypted\":false,\"frames\":%zu,\"rate\":%u}\n",physical.frames,physical.rate);
+            if (o->json) printf("{\"schemaVersion\":1,\"type\":\"encoded\",\"format\":\"wav\",\"encrypted\":false,\"frames\":%zu,\"rate\":%u,\"audioProfile\":\"%s\"}\n",physical.frames,physical.rate,profile_id(o->profile));
             else fprintf(stderr,"Cleartext WAV written; no pairing or receipt is implied.\n");
             result=0;
         }
@@ -304,7 +311,7 @@ static int file_command(options *o) {
         for (i=0;i<pcm.frames && !status;i+=997) { size_t n=pcm.frames-i; if (n>997) n=997; status=ts_resampler_feed(&resampler,receiver,pcm.samples+i,n); }
         if (!status) status=ts_resampler_finish(&resampler,receiver);
         if (status) { snprintf(error,sizeof(error),"ToneSeal sound could not be decoded within its bounds."); goto decode_done; }
-        if (!ctx.packet_count) { result=1; snprintf(error,sizeof(error),"No packet was found."); goto decode_done; }
+        if (!ctx.packet_count) { result=1; snprintf(error,sizeof(error),"No packet was found. Use the same --profile as the sender/encoder; choose nearby, telephone or ultrasonic."); goto decode_done; }
         if (!output_open(&ctx)) goto decode_done;
         result=1;
         for (i=0;i<ctx.packet_count;++i) {
@@ -317,7 +324,9 @@ static int file_command(options *o) {
         }
         if (ctx.io_error) result=2;
         if (ctx.output_created) { close(ctx.output_fd); if (!ctx.output_written) unlink(o->output); }
-        if (result==1) snprintf(error,sizeof(error),"Only opaque/control records found; encrypted packets require the live session. Use --packets to inspect bytes.");
+        if (result==1) snprintf(error,sizeof(error),"%s",o->file==FILE_FROM_TL?
+            "Only opaque/control records found; from-tl recovers cleartext ToneSeal data. Encrypted packets require the live session.":
+            "Only opaque/control records found; encrypted packets require the live session. Use --packets to inspect bytes.");
 decode_done:
         free(receiver); ts_pcm_free(&pcm); OPENSSL_cleanse(&ctx,sizeof(ctx)); OPENSSL_cleanse(text,sizeof(text));
     }
@@ -453,14 +462,14 @@ int main(int argc, char **argv) {
     sigaction(SIGINT,&action,NULL); sigaction(SIGTERM,&action,NULL); sigaction(SIGHUP,&action,NULL); sigaction(SIGTSTP,&action,NULL); signal(SIGPIPE,SIG_IGN);
     parsed=parse(argc,argv,&o);
     if (parsed<0) return 0;
-    if (!parsed) { fputs("Invalid command/options; use toneseal --help.\n",stderr); return 2; }
+    if (!parsed) { fprintf(stderr,"Invalid command/options; use toneseal %s--help.\n",argc>1&&!strcmp(argv[1],"text")?"text ":""); return 2; }
     if (!strcmp(o.command,"capabilities")) {
-        puts("{\"schemaVersion\":1,\"type\":\"capabilities\",\"version\":\"0.1.0\",\"experimental\":true,"
+        printf("{\"schemaVersion\":1,\"type\":\"capabilities\",\"version\":\"0.1.0\",\"experimental\":true,"
              "\"commands\":[\"send\",\"receive\",\"chat\",\"text\",\"encode\",\"decode\",\"devices\",\"audio-probe\",\"capabilities\"],"
-             "\"textConversions\":{\"actions\":[\"to-tl\",\"from-tl\",\"to-wav\",\"from-wav\"],\"encoding\":\"toneseal-text-over-sound\",\"maxTextBytes\":96,\"timelineMaxBytes\":200000,\"timelineRate\":48000},"
+             "\"textConversions\":{\"actions\":[\"to-tl\",\"from-tl\",\"to-wav\",\"from-wav\"],\"encoding\":\"toneseal-text-over-sound\",\"maxTextBytes\":96,\"timelineMaxBytes\":200000,\"timelineRate\":48000,\"tlVersion\":%u,\"engineVersion\":%u,\"timelineProfiles\":[\"nearby\",\"telephone\",\"ultrasonic\"],\"wavProfiles\":[\"nearby\",\"telephone\",\"ultrasonic\"],\"profileDetection\":\"explicit\"},"
              "\"modes\":[\"message\",\"password\",\"clear\"],\"profiles\":[\"nearby\",\"telephone\",\"ultrasonic\"],\"crypto\":[\"p256\",\"x25519\"],\"maxTextBytes\":96,\"maxPending\":8,"
              "\"peerIdleSeconds\":{\"default\":60,\"min\":1,\"max\":120},\"localCommands\":[\"/confirm\",\"/quit\",\"/stop\",\"/reveal\",\"/send TEXT\"],"
-             "\"events\":[\"status\",\"message\",\"password\",\"delivered\",\"encoded\",\"packet\",\"audio-level\"],\"passwordMasked\":true,\"automaticClipboard\":false,\"automaticPeerAuthentication\":false}");
+             "\"events\":[\"status\",\"message\",\"password\",\"delivered\",\"encoded\",\"packet\",\"audio-level\"],\"passwordMasked\":true,\"automaticClipboard\":false,\"automaticPeerAuthentication\":false}\n",TS_TL_VERSION,TS_TL_ENGINE_VERSION);
         return fflush(stdout)==EOF || ferror(stdout)?2:0;
     }
     if (!strcmp(o.command,"devices")) return ts_audio_devices(stdout,o.json)?0:2;

@@ -11,12 +11,14 @@ try {
  if(command==='encode'){
   const text=option('--text'),out=option('--out'),harness=path.resolve(option('--harness',path.join(synth,'build/s12e10p1v1/harness')));
   if(args.length||text===undefined||!out)throw Error('encode requires --text MESSAGE --out NEW_DIRECTORY [--harness PATH].');
-  const identity=run(harness,['--engine']).trim().slice(7),timeline=messageTimeline(text,identity),directory=path.resolve(out);
+  const format=run(harness,['--tl-format']).trim();
+  if(!/^TL_FORMAT tl_version=[1-9][0-9]* engine_version=[1-9][0-9]*$/.test(format))throw Error('Use a portable-TL-capable JotTune Synth harness.');
+  const identity=run(harness,['--engine']).trim().slice(7),timeline='# jottune-tl 1 1\n# {"title":"ToneSeal Nearby diagnostic packet"}\n# end-jottune-tl\n'+messageTimeline(text,identity),directory=path.resolve(out);
   fs.mkdirSync(directory);let complete=false;
   try {const draft=path.join(directory,'draft.tl'),record=path.join(directory,'message.tl'),wav=path.join(directory,'message.wav');fs.writeFileSync(draft,timeline,{flag:'wx'});
    const rendered=run(harness,['--play',draft,'--merged',record,'--wav',wav,'--metrics']);
    if(!/clipped=0/.test(rendered)||!/block_indep=yes/.test(rendered)||!/match=yes/.test(run(harness,['--play',record])))throw Error('Native canonical verification failed.');
-   fs.unlinkSync(draft);complete=true;console.log(JSON.stringify({ok:true,experimental:true,encrypted:false,authenticated:false,record,wav}));
+   fs.unlinkSync(draft);complete=true;console.log(JSON.stringify({ok:true,experimental:true,encrypted:false,authenticated:false,audioProfile:'nearby',tlVersion:1,engineVersion:1,record,wav}));
   }finally{if(!complete)fs.rmSync(directory,{recursive:true,force:true});}
  }else if(command==='decode'){
   const input=option('--wav'),decoder=path.resolve(option('--decoder',path.join(lab,'build/receiver')));

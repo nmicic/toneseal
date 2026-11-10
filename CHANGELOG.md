@@ -24,6 +24,9 @@ Initial public-source release, prepared for publication.
 - Upstream portable TL compatibility: package the shared document helper, use
   explicit musical-body replay in the C CLI, and test header/version handling,
   metadata-independent sound and browser/C byte-exact recovery.
+- Versioned CLI TL export for every audio profile, including self-contained
+  Telephone tones/timing; matching conversion help, JSON capabilities and public
+  build/round-trip documentation.
 - Experimental Near-ultrasonic audio profile in the primary web interface and
   C CLI, with matching 18.4–19.975 kHz synthesis, integer mixer/low-pass capture,
   longer timing, live spectrum ranges and synthetic interoperability checks.

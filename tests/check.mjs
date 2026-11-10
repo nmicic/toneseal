@@ -68,6 +68,8 @@ try {
  await assert.rejects(()=>decodePCM(module,crowded),/refused|finish/);checks++;
  const delivery=path.join(temporary,'cli-message'),cli=path.join(lab,'cli.mjs');
  const encoded=JSON.parse(run(process.execPath,[cli,'encode','--text','CLI delivery é','--out',delivery,'--harness',harness]));
+ assert.equal(encoded.audioProfile,'nearby');assert.equal(encoded.tlVersion,1);assert.equal(encoded.engineVersion,1);
+ check(fs.readFileSync(encoded.record,'utf8').startsWith('# jottune-tl 1 1\n'),'legacy diagnostic exports a portable versioned TL');
  check(encoded.ok&&fs.existsSync(encoded.record)&&fs.existsSync(encoded.wav),'CLI delivers accessible canonical TL and WAV');
  assert.deepEqual(JSON.parse(run(process.execPath,[cli,'decode','--wav',encoded.wav,'--decoder',receiver])).messages.map(row=>row.text),['CLI delivery é']);checks++;
  assert.equal(spawnSync(process.execPath,[cli,'encode','--text','replacement','--out',delivery,'--harness',harness]).status,2);check(/match=yes/.test(run(harness,['--play',encoded.record])),'existing delivery is never overwritten');

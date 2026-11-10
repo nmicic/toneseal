@@ -376,6 +376,14 @@ terminates the Worker and discards its cache.
 
 ### Audio profiles
 
+Native CLI portable TL file exports declare `# jottune-tl 1 1` for all three
+audio profiles. These document/engine requirements are independent of physical
+profile selection and of session wire versions. File TL embeds physical
+frequencies and timing, including Telephone's 4/3 timing scale; generic synth
+playback therefore needs no additional speed change. Live and WAV Telephone
+generation retain the existing canonical-PCM playback scaling described below.
+The file header and descriptive title are not sent over the audio channel.
+
 `web/audio-profiles.mjs` defines three explicitly selected physical profiles.
 Nearby retains canonical playback: 600–3750 Hz, 20 ms symbols, and at most
 4.16 seconds per frame. Telephone plays that verified PCM at 0.75 speed:
