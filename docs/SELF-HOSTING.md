@@ -40,3 +40,8 @@ It never fetches a renderer or contacts a hosting API.
 The dependency includes its browser runtime support and archived engine files.
 These are generated release inputs, not a second copy of the synth source.
 Their original licenses and toolchain notices are copied into `dist/`.
+Newer prepared bundles also require the upstream `tl-document.mjs` helper,
+imported by the worker, policy and authoring modules. The builder includes that
+dependency unchanged and refuses an incomplete bundle. Older headerless-renderer
+bundles remain buildable; rebuild with a current bundle to gain portable document
+validation and metadata-preserving diagnostic exports.

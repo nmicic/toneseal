@@ -113,9 +113,12 @@ static int render_timeline(const char *timeline, size_t len, ts_pcm *out, char *
         position+=written;
     }
     if (fms_player_clipped(player)) { snprintf(error,cap,"Synth waveform clipped."); goto done; }
-    out->hash=fms_player_hash(player); record_len=fms_player_record_text(player,NULL,0);
+    /* Replay the musical body, independently of descriptive metadata. The
+     * generated packet export is body-only too; from-tl decodes text, rather
+     * than editing or re-exporting an imported portable document. */
+    out->hash=fms_player_hash(player); record_len=fms_player_record_body_text(player,NULL,0);
     if (!record_len || record_len>TS_TIMELINE_MAX+1u) { snprintf(error,cap,"Canonical synth record is unavailable."); goto done; }
-    record=malloc(record_len); if (!record || fms_player_record_text(player,record,record_len)!=record_len) goto done;
+    record=malloc(record_len); if (!record || fms_player_record_body_text(player,record,record_len)!=record_len) goto done;
     if (fms_player_import(record,record_len-1,NULL,&replay,error,cap)!=FMS_OK) goto done;
     for (position=0;position<info.frames;position+=written) {
         uint32_t count=info.frames-position; if (count>113) count=113;

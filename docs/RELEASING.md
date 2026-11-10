@@ -15,17 +15,20 @@ Record the ToneSeal commit, JotTune Synth commit/release, selected renderer ID
 and renderer digest in the release notes. Use a tested immutable synth revision
 for reproducing a release. The currently tested prepared renderer is:
 
-- Source revision: `d2997c99c01f5a1d75af6c2c68454a99d02356d6`
-- Fresh source build ID: `dev-9ab5e7ce88a22ed9`
+- Source revision: `9089096fc23d8c2cd25f6777ab2c73865c83cb2d`
+- Prepared source build ID: `dev-eb6825e6141b32b6`
 - Browser Wasm SHA-256:
-  `24c6110ebb8a0b69c3dab2c806b499fc4be7a02dfc41de38d350b228284e35b5`
+  `df2f0443d1ba752fb9ab8a2b8f4505290e01c3333fce9422ec795e1db076aaa9`
 
 These identify the tested artifact, not an assertion that an arbitrary newer
 synth checkout produces the same default bundle. The builder validates the
 prepared registry and referenced checksums; it does not download a dependency.
-The fresh synth checkout passed `make web`, ToneSeal's standalone site build,
-the native CLI/acoustic suite and actual browser worker/replay checks. The
-previously tested archive ID `2026-10-26-8443cd5` has the same browser Wasm digest.
+This revision adds portable TL headers without changing packet sound. The
+previously tested `dev-9ab5e7ce88a22ed9` / `2026-10-26-8443cd5` renderer digest
+was `24c6110ebb8a0b69c3dab2c806b499fc4be7a02dfc41de38d350b228284e35b5`.
+The dependency's source revision must be published before the updated CLI CI pin
+can be fetched on GitHub. A prepared development renderer is a local test input,
+not a newly published upstream release.
 See [self-hosting](SELF-HOSTING.md) for source-root and prepared-asset overrides.
 
 ## Checks

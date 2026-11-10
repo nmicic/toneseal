@@ -63,6 +63,16 @@ the real synths and opposite receivers. These are synthetic sound tests, not
 physical speaker/microphone or telephone acceptance. See
 [native instructions](NATIVE-CLI.md).
 
+After building with the portable-TL-capable synth, `npm run test:tl` exercises
+the assembled worker in real Chromium and WebKit, including phone viewports and
+a nested hosting path. It checks LF/CRLF metadata preservation, stable musical
+identity, a distinct full-file checksum, unchanged PCM and byte-exact recovery
+for Nearby, Telephone and Near-ultrasonic. New versions, malformed framing,
+invalid metadata and older archived renderer bypass attempts must release no
+audio. Native file tests separately cover header-bearing text recovery, exact
+PCM equality, malformed/version/size refusal and saved-hash failure. These
+checks use upstream document helpers; ToneSeal does not vendor another parser.
+
 The experimental Near-ultrasonic profile is included in browser/C waveform
 comparisons at 44.1/48 kHz, full encrypted Password/chat PCM transfers and
 byte-exact text/TL/WAV round trips. Its mixer/filter constants are regenerated

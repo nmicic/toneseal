@@ -9,6 +9,7 @@
     "build:cli": "python3 scripts/build-cli.py",
     "test:cli": "python3 tests/native-cli.py",
     "test:cli:pcm": "python3 tests/native-cli.py --pcm",
+    "test:tl": "node tests/tl-compat-browser.mjs",
     "test": "python3 tests/build-web.py && python3 scripts/ultrasonic-tables.py --check && node --test tests/session.mjs tests/auto-transfer.mjs tests/demo-identity.mjs tests/artifact-transfer.mjs tests/chat-transfer.mjs tests/audio-visual-taps.mjs tests/peer-idle.mjs tests/codec-vectors.mjs tests/ultrasonic.mjs",
     "test:simulation": "node tests/simulated-transfer.mjs",
     "test:acoustic": "node tests/acoustic-impairments.mjs",
@@ -22,7 +23,7 @@
     "test:visuals": "node tests/audio-visual-browser.mjs",
     "test:chat": "node tests/chat-simulation.mjs && node tests/chat-close-simulation.mjs && node tests/chat-browser.mjs",
     "test:report": "node scripts/render-test-report.mjs",
-    "test:e2e": "npm run build && npm test && npm run test:simulation && npm run test:acoustic && npm run test:throughput && npm run test:crypto-audio && node tests/auto-audio-link.mjs && node tests/auto-browser.mjs && node tests/auto-render-browser.mjs && npm run test:showcase && npm run test:mobile && npm run test:app && npm run test:visuals && npm run test:chat && npm run test:automation && npm run test:report",
+    "test:e2e": "npm run build && npm test && npm run test:simulation && npm run test:acoustic && npm run test:throughput && npm run test:crypto-audio && node tests/auto-audio-link.mjs && node tests/auto-browser.mjs && node tests/auto-render-browser.mjs && npm run test:tl && npm run test:showcase && npm run test:mobile && npm run test:app && npm run test:visuals && npm run test:chat && npm run test:automation && npm run test:report",
     "serve": "python3 scripts/serve.py --directory dist",
     "test:automation": "node tests/automation-browser.mjs",
     "test:room": "node tests/browser-room.mjs --channel pcm"

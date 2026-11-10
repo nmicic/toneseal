@@ -65,7 +65,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: chimepond/jottune-synth
-          ref: d2997c99c01f5a1d75af6c2c68454a99d02356d6
+          ref: 9089096fc23d8c2cd25f6777ab2c73865c83cb2d
           path: out/jottune-synth
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0

@@ -59,6 +59,25 @@ class RendererAssets(unittest.TestCase):
         (self.assets / "authoring.mjs").write_text("export const compileScore = () => {};\n")
         self.assertNotIn("authoring.mjs", builder.renderer_support_assets(self.assets, self.entries))
 
+    def test_portable_document_dependency_is_required_and_packaged(self):
+        self.worker.write_text("import {parseDocument} from './tl-document.mjs';\n")
+        with self.assertRaisesRegex(ValueError, "requires missing tl-document\\.mjs"):
+            builder.renderer_support_assets(self.assets, self.entries)
+        (self.assets / "tl-document.mjs").write_text("export const parseDocument = () => {};\n")
+        self.assertIn("tl-document.mjs", builder.renderer_support_assets(self.assets, self.entries))
+
+    def test_transitive_document_dependency_is_packaged(self):
+        self.worker.write_text("import './authoring.mjs';\n")
+        (self.assets / "authoring.mjs").write_text("import './tl-document.mjs';\n")
+        with self.assertRaisesRegex(ValueError, "requires missing tl-document\\.mjs"):
+            builder.renderer_support_assets(self.assets, self.entries)
+        (self.assets / "tl-document.mjs").write_text("export const parseDocument = () => {};\n")
+        self.assertIn("tl-document.mjs", builder.renderer_support_assets(self.assets, self.entries))
+
+    def test_legacy_renderer_does_not_gain_unused_document_helper(self):
+        (self.assets / "tl-document.mjs").write_text("export const parseDocument = () => {};\n")
+        self.assertNotIn("tl-document.mjs", builder.renderer_support_assets(self.assets, self.entries))
+
     def test_companion_is_complete_and_digest_checked(self):
         self.companion()
         names = builder.renderer_support_assets(self.assets, self.entries)

@@ -44,6 +44,9 @@ def build(output, *, kind='cli', synth_root=None, sanitize=False):
         bridge = synth_root / 'bindings/native'
         if not (bridge / 'jottune_bridge.h').is_file():
             raise RuntimeError('Provide a JotTune Synth checkout with --synth-root or JOTTUNE_SYNTH_ROOT.')
+        if 'fms_player_record_body_text(' not in (bridge / 'jottune_bridge.h').read_text():
+            raise RuntimeError('Update JotTune Synth to a portable-TL-capable C SDK (9089096 or newer). '
+                               'Older readers cannot enforce the TL/engine compatibility header.')
         # The SDK Makefile tracks source changes, but compiler/feature flags
         # also need separate products. Strict glibc C99 needs the default-source
         # feature declarations for the SDK's POSIX host helpers.

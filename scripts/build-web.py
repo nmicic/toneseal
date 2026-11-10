@@ -38,6 +38,14 @@ def renderer_support_assets(assets, entries):
         raise ValueError('Synth worker requires missing spatial.mjs.')
     if spatial.is_file():
         names.append('spatial.mjs')
+    # Portable TL validation is shared by the worker, policy and authoring
+    # adapter. Keep it in the prepared dependency bundle, including when only
+    # a transitive importer needs it; do not maintain another metadata parser.
+    if any('./tl-document.mjs' in inside(assets, name).read_text()
+           for name in names if name.endswith('.mjs') and inside(assets, name).is_file()):
+        if not inside(assets, 'tl-document.mjs').is_file():
+            raise ValueError('Synth renderer requires missing tl-document.mjs.')
+        names.append('tl-document.mjs')
     manifest_path = inside(assets, 'spatial-view.json')
     helper_path = inside(assets, 'spatial-view.wasm')
     if manifest_path.exists() or helper_path.exists():

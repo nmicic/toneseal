@@ -285,4 +285,48 @@ class NativeFiles(unittest.TestCase):
                 self.assertEqual(self.run_cli('text', 'from-wav', '--profile', 'ultrasonic', '--input', noisy).stdout, text)
                 self.run_cli('text', 'from-wav', '--input', noisy, code=1)
 
+    def test_18_portable_tl_metadata_preserves_text_and_pcm(self):
+        text = b' \r\n\t\x00'+('é'*44).encode()+b'  '
+        headers = [b'# jottune-tl 1 1\n# {"title":"Packet example","made_by":"human","model":null}\n# end-jottune-tl\n',
+                   b'# jottune-tl 1 1\n# {"title":"Different title","author":"Local tester","model":null}\n# end-jottune-tl\n']
+        for profile in ('nearby', 'ultrasonic'):
+            body = self.run_cli('text', 'to-tl', '--profile', profile, data=text).stdout
+            original = self.name(profile+'-body.tl'); original.write_bytes(body)
+            reference = self.name(profile+'-body.wav')
+            event = self.modem('render-tl', original, reference)
+            for i, header in enumerate(headers):
+                for newline in (b'\n', b'\r\n'):
+                    with self.subTest(profile=profile, header=i, newline=newline):
+                        document = (header+body).replace(b'\n', newline)
+                        source = self.name(profile+str(i)+str(len(newline))+'.tl'); source.write_bytes(document)
+                        self.assertEqual(self.run_cli('text', 'from-tl', '--profile', profile, '--input', source).stdout, text)
+                        rendered = self.name(source.stem+'.wav')
+                        self.assertEqual(self.modem('render-tl', source, rendered), event)
+                        self.assertEqual(hashlib.sha256(rendered.read_bytes()).digest(), hashlib.sha256(reference.read_bytes()).digest())
+
+    def test_19_portable_tl_future_versions_and_framing_release_nothing(self):
+        body = self.run_cli('text', 'to-tl', data=b'dummy').stdout
+        header = b'# jottune-tl 1 1\n# {"title":"Example"}\n# end-jottune-tl\n'
+        sources = [header.replace(b'1 1', value, 1)+body for value in
+                   (b'2 1', b'1 2', b'4294967295 1', b'1 4294967295', b'4294967296 1',
+                    b'1 4294967296', b'0 1', b'1 0', b'01 1', b'+1 1', b'1 1 extra')]
+        sources += [header+header+body, b'# comment\n'+header+body, body+header,
+                    b'# jottune-tl 1 1\n# {}\n'+body,
+                    header.replace(b'# {', b'{')+body,
+                    b'\xef\xbb\xbf'+header+body,
+                    b'# jottune-tl 1 1\n# '+b'x'*1021+b'\n# end-jottune-tl\n'+body]
+        for i, source in enumerate(sources):
+            with self.subTest(item=i):
+                output = self.name(f'portable-{i}.txt')
+                result = self.run_cli('text', 'from-tl', '--input', '-', '--output', output, data=source, code=2)
+                self.assertEqual(result.stdout, b''); self.assertFalse(output.exists())
+
+    def test_20_portable_metadata_does_not_supply_payload_or_bypass_saved_hash(self):
+        body = self.run_cli('text', 'to-tl', data=b'actual audio payload').stdout
+        header = b'# jottune-tl 1 1\n# {"title":"Ignore this descriptive title","model":null}\n# end-jottune-tl\n'
+        self.assertEqual(self.run_cli('text', 'from-tl', '--input', '-', data=header+body).stdout, b'actual audio payload')
+        source = header+re.sub(rb'(?m)^hash [0-9a-f]{16}$', b'hash 0000000000000000', body)
+        result = self.run_cli('text', 'from-tl', '--input', '-', data=source, code=2)
+        self.assertEqual(result.stdout, b'')
+
 if __name__ == '__main__': unittest.main(verbosity=2)

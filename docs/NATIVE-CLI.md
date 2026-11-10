@@ -17,6 +17,10 @@ development libraries and PortAudio development libraries. Dependencies are
 installed separately; none are vendored. Generated SDK/client products go into
 ToneSeal's ignored `build/` directory.
 
+Use a JotTune Synth checkout with the portable TL C API (revision `9089096` or
+newer). The build refuses older SDKs because their comment-only readers cannot
+enforce the new TL/engine compatibility requirements.
+
 Ubuntu/Debian:
 
 ```sh
@@ -229,6 +233,15 @@ physical playback scaling. Both inverse commands accept
 `--input -` for stdin and default to stdout. `--json` exposes metadata/events;
 `to-tl --json` requires a separate output file to keep its stdout valid JSON.
 `capabilities` lists all four actions under `textConversions`.
+
+`from-tl` accepts legacy headerless timelines and the optional upstream
+`# jottune-tl 1 1` document header. The native synth checks compatibility,
+framing, line bounds, exact engine identity and the saved PCM hash before text
+is released. ToneSeal's 200,000-byte limit remains stricter than the general
+portable document limit. Descriptive JSON stays opaque to this audio decoder;
+it never supplies recovered text or changes the sound. This conversion produces
+text, not an edited/re-exported TL document. Internal replay and generated packet
+TL use the explicit musical-body API, without inventing song metadata.
 
 These file conversions carry **cleartext** and imply no pairing or delivery
 receipt. Transfer IDs are freshly randomized, so two encodings of the same
