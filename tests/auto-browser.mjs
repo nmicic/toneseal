@@ -252,7 +252,7 @@ async function passwordStartupChecks() {
 async function peerIdleChecks() {
   // Use the real configured deadlines with a controlled browser clock. Only
   // the acoustic room is substituted; no peer sends data in these cases.
-  for (const [mode, timeout] of [['message',30000],['password',60000],['clear',120000]]) {
+  for (const [mode, timeout] of [['message',30000],['password',60000],['clear',120000],['message',3600000]]) {
     const context = await browser.newContext({viewport:{width:1280,height:720}});
     try {
       await context.route('**/auto-audio-link.mjs', route => route.fulfill({contentType:'text/javascript',body:stub}));
@@ -262,7 +262,7 @@ async function peerIdleChecks() {
       await page.clock.install({time:new Date('2026-10-30T12:00:00Z')});
       await page.goto(url+'?view=web');
       assert.equal(await page.locator('#peer-idle-timeout').inputValue(),'60000','A new page defaults to one minute');
-      assert.deepEqual(await page.locator('#peer-idle-timeout option').evaluateAll(options=>options.map(option=>option.value)),['30000','60000','120000']);
+      assert.deepEqual(await page.locator('#peer-idle-timeout option').evaluateAll(options=>options.map(option=>option.value)),['30000','60000','120000','300000','600000','1800000','3600000']);
       await page.locator('#mode-advanced').click();
       await page.locator('#peer-idle-timeout').selectOption(String(timeout));
       await page.locator(`#mode-${mode}`).click();
@@ -276,6 +276,11 @@ async function peerIdleChecks() {
       assert.equal(running.session.active,true);
       assert.equal(running.session.peerIdle.timeoutMs,timeout,'The Advanced value reaches the controller unchanged');
       assert.equal(running.session.peerIdle.lastPeerAgeMs,null);
+      if(timeout===3600000) {
+        assert.equal(running.limits.chatLifetimeMs,7200000);
+        assert.equal(running.limits.singleTransferLifetimeMs,7200000);
+        assert.equal(await page.evaluate(()=>window.__air.options.maxRunMs),7200000);
+      }
       assert.ok(running.session.peerIdle.remainingMs>0 && running.session.peerIdle.remainingMs<=timeout);
       assert.equal(await page.locator('#peer-idle-timeout').isDisabled(),true,'The setting is locked during audio');
       assert.equal(await page.evaluate(()=>window.__air.running),true);

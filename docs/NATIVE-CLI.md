@@ -107,7 +107,7 @@ printf '%s' 'Hello from the terminal' | build/toneseal send --mode clear
 | `--input FILE\|-` | Sender text from a file/stdin. |
 | `--output FILE\|-` | Explicit raw received-byte export; files must be new and are created as 0600. |
 | `--input-device ID --output-device ID` | Select devices; IDs can change with hardware. |
-| `--timeout SECONDS` | No-new-peer-response deadline: 1–120 seconds, default 60. |
+| `--timeout SECONDS` | Peer/message idle timeout: 1–3,600 seconds, default 60. |
 | `--json` | Versioned newline-delimited status/message/delivery events on stdout. |
 | `--control-stdin` | Explicit local command pipe, including `/confirm`. |
 
@@ -147,9 +147,16 @@ loss repairs more time; the default remains 60 seconds with no automatic change.
 
 The initial sender owns the chat poll clock, without wall-clock synchronization.
 Later messages reuse established keys. Bitmap receipts and exact ciphertext
-retries repair loss in either direction. Sessions are bounded to three minutes
-for one-shot transfers or ten minutes for chat. Timeout, signal and failure
-paths release audio and keys. Ctrl+C stops immediately; Ctrl+Z is handled as
+retries repair loss in either direction. Chat closes after `--timeout` seconds
+without message activity; keepalives do not reset this clock. Admitted queues
+finish before the message-idle countdown runs. The same timeout separately
+limits a missing peer response, including fingerprint comparison. Choose the
+same longer timeout on both peers, for example `--timeout 3600` for one hour.
+
+Sessions normally have a three-minute limit for one-shot transfers or ten
+minutes for chat. Above 120 seconds, `--timeout` extends the session limit to the
+greater of its normal limit and twice the timeout, at most two hours. Timeout,
+signal and failure paths release audio and keys. Ctrl+C stops immediately; Ctrl+Z is handled as
 a stop rather than suspending capture. The lifetime clock includes system sleep.
 
 Encrypted send completes after an authenticated receipt. Clear text uses matching
@@ -175,6 +182,8 @@ sender heard its receipt are different observations.
 have `schemaVersion: 1` and `type`. Status exposes phase, active/connected state,
 verification, fingerprint, queue depth, transmitted/received/retried frames,
 candidate CRC failures, input level, capture drops and remaining peer-idle time.
+JSON status also reports `messageIdleRemainingMs` for connected chat; `null`
+means its clock is not running, including while admitted queues await receipts.
 CRC candidate failures are diagnostic attempts, not a lost-message count.
 Errors use stderr; check the exit code. `devices --json` is a single JSON array.
 

@@ -43,7 +43,7 @@ function controller(t, options={}) {
 
 test('peer timeout defaults to one minute, validates before capture, and remains wall-clock on Telephone',async t=>{
   clock(t);const p=controller(t);
-  for(const value of [0,999,120001,NaN,Infinity,'60000',60000.5]) {
+  for(const value of [0,999,3600001,NaN,Infinity,'60000',60000.5]) {
     await assert.rejects(p.transfer.start({idleTimeoutMs:value}),/timeout/);
     assert.equal(p.link,undefined,'Invalid choice cannot open audio');
   }
@@ -116,10 +116,10 @@ test('Stop cancels the old deadline and a new run receives its complete response
   await advance(t,1);assert.equal(p.transfer.state.active,false);
 });
 
-test('fresh authenticated empty chat turns keep a healthy peer alive; silence or replay then stops both sides',async t=>{
+async function chatPair(t) {
   clock(t);
   const links=[],deliveries=[[],[]],records=[];
-  let blocked=false;
+  const channel={blocked:false,dropData:false};
   const peers=[0,1].map(side=>new ChatTransfer({now:()=>Date.now(),
     timing:{retryMs:100,retryJitterMs:0,turnaroundMs:5,initialDelayMs:2,maxAttempts:100,
       turnTimeoutMs:200,idlePollMs:30,maxIdlePollMs:60,maxRunMs:20000},
@@ -129,7 +129,8 @@ test('fresh authenticated empty chat turns keep a healthy peer alive; silence or
       async send(packet){
         records.push({side,packet:packet.slice()});
         const peer=links[1-side];
-        if(!blocked&&peer?.running)queueMicrotask(()=>peer.callbacks.onPackets([packet.slice()]));
+        const data=packet[2]===3 && new DataView(packet.buffer,packet.byteOffset,packet.byteLength).getUint32(11,false)<0x80000000;
+        if(!channel.blocked && !(channel.dropData && data) && peer?.running)queueMicrotask(()=>peer.callbacks.onPackets([packet.slice()]));
       },
     }),
   }));
@@ -139,10 +140,15 @@ test('fresh authenticated empty chat turns keep a healthy peer alive; silence or
   for(let i=0;i<50&&!deliveries[0].length;i++)await advance(t,20);
   assert.equal(deliveries[0].length,1);
   assert.ok(peers.every(peer=>peer.state.connected));
-  for(let i=0;i<100;i++)await advance(t,20);
+  return {peers,links,deliveries,records,channel};
+}
+
+test('fresh authenticated empty turns prove liveness, but silence or replay still expires the peer clock',async t=>{
+  const {peers,links,deliveries,records,channel}=await chatPair(t);
+  for(let i=0;i<20;i++)await advance(t,20);
   assert.ok(peers.every(peer=>peer.state.active),'Empty authenticated turns renew the deadline');
-  assert.ok(peers.every(peer=>peer.state.chatStats.turns>5));
-  blocked=true;
+  assert.ok(peers.every(peer=>peer.state.chatStats.turns>2));
+  channel.blocked=true;
   const captured=records.filter(record=>record.packet.length===51).slice(-4);
   for(let i=0;i<60;i++) {
     for(const {side,packet} of captured)peers[1-side].receive([packet]);
@@ -152,4 +158,60 @@ test('fresh authenticated empty chat turns keep a healthy peer alive; silence or
   assert.ok(links.every(link=>!link.running));
   assert.equal(deliveries[0].length,1,'Previously confirmed delivery remains confirmed');
   for(const peer of peers)assert.match(peer.state.status,/No new peer response.*without delivery receipts remain unconfirmed/);
+});
+
+test('quiet chat closes both peers despite keepalives and releases every resource',async t=>{
+  const {peers,links,deliveries}=await chatPair(t);
+  for(let i=0;i<80 && peers.some(peer=>peer.state.active);i++)await advance(t,20);
+  assert.ok(peers.every(peer=>!peer.state.active));
+  assert.ok(peers.some(peer=>peer.state.close.reason==='message-idle'));
+  for(const peer of peers) {
+    assert.equal(peer.state.phase,'closed');assert.equal(peer.state.close.outcome,'confirmed');
+    assert.ok(peer.state.chatStats.turns>5,'Keepalives continued until the message deadline');
+    assert.equal(peer.state.messageIdle.remainingMs,null);assert.equal(peer._timers.size,0);
+    assert.equal(peer._session.info.state,'idle');
+  }
+  assert.ok(links.every(link=>!link.running));assert.equal(deliveries[0].length,1);
+});
+
+test('a new message and its receipt renew the chat inactivity window in either direction',async t=>{
+  const {peers,deliveries}=await chatPair(t);
+  for(const side of [1,0]) {
+    for(let i=0;i<30;i++)await advance(t,20);
+    const before=deliveries[side].length;
+    await settle(t,peers[side].enqueue(`New message from ${side}`));
+    for(let i=0;i<30 && deliveries[side].length===before;i++)await advance(t,20);
+    assert.equal(deliveries[side].length,before+1);
+    assert.ok(peers.every(peer=>peer.state.messageIdle.remainingMs>800 || peer.state.messageIdle.waitingForReceipts));
+    assert.ok(peers.every(peer=>peer.state.active && !peer.state.closing));
+  }
+  for(let i=0;i<80 && peers.some(peer=>peer.state.active);i++)await advance(t,20);
+  assert.ok(peers.every(peer=>peer.state.close.outcome==='confirmed'));
+});
+
+test('message idle countdown pauses for lost DATA and restarts after byte-exact delivery',async t=>{
+  const {peers,deliveries,channel}=await chatPair(t);
+  channel.dropData=true;
+  await settle(t,peers[0].enqueue('Delivery must finish before idle closing.'));
+  for(let i=0;i<80;i++)await advance(t,20);
+  assert.ok(peers.every(peer=>peer.state.active && !peer.state.closing));
+  assert.equal(peers[0].state.messageIdle.waitingForReceipts,true);
+  assert.equal(peers[0].state.messageIdle.remainingMs,null);
+  channel.dropData=false;
+  for(let i=0;i<40 && deliveries[0].length<2;i++)await advance(t,20);
+  assert.equal(deliveries[0].length,2);
+  for(let i=0;i<80 && peers.some(peer=>peer.state.active);i++)await advance(t,20);
+  assert.ok(peers.every(peer=>peer.state.close.outcome==='confirmed'));
+});
+
+test('one-hour timeout reaches the audio transport and survives the normal session ceiling',async t=>{
+  clock(t);const p=controller(t);
+  await p.transfer.start({idleTimeoutMs:3600000});
+  assert.equal(p.transfer.state.lifetimeMs,7200000);
+  assert.equal(p.link.callbacks.maxRunMs,7200000);
+  await advance(t,180001);assert.equal(p.transfer.state.active,true);
+  await advance(t,3419998);assert.equal(p.transfer.state.active,true);
+  await advance(t,1);assert.equal(p.transfer.state.active,false);
+  assert.match(p.transfer.state.status,/No new peer response for 3600 seconds/);
+  assert.equal(p.transfer._timers.size,0);assert.equal(p.link.running,false);
 });

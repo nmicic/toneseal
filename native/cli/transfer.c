@@ -20,7 +20,7 @@ struct ts_transfer {
     double retry_due,linger_deadline,close_deadline,poll_deadline,next_poll;
     job jobs[8],sending; size_t job_count; int transmitting;
     turn poll,response; int poll_active,sending_turn,close_stage,peer_closing;
-    uint32_t last_peer_turn; unsigned idle_rounds;
+    uint32_t last_peer_turn; unsigned idle_rounds; int peer_pending;
     ts_message_callback message; ts_delivery_callback delivery; void *context;
 };
 static int packet_equal(const ts_packet *a, const uint8_t *b, size_t n) {
@@ -48,6 +48,12 @@ static int session_ok(ts_transfer *t, int ok) {
     return ok;
 }
 static void progress(ts_transfer *t) { t->status.idle_deadline=t->status.now+t->options.idle_ms; }
+static void message_idle(ts_transfer *t, int activity) {
+    if (!t->options.chat || !t->status.connected || t->close_stage || pending_count(t) || t->peer_pending) {
+        t->status.message_idle_deadline=0; return;
+    }
+    if (activity || !t->status.message_idle_deadline) t->status.message_idle_deadline=t->status.now+t->options.idle_ms;
+}
 static int queue(ts_transfer *t, const ts_packet *p, int kind, double delay, unsigned generation) {
     size_t i;
     if (!t->status.active) return 0;
@@ -80,13 +86,16 @@ static void info(ts_transfer *t) {
     t->status.pending=s.pending_count;
 }
 static void connected(ts_transfer *t) {
+    int first=!t->status.connected;
     if (!t->status.connected && !session_ok(t,ts_session_lock_epoch(t->session))) return;
     t->status.connected=1;
+    message_idle(t,first);
     phase(t,t->close_stage?TS_CLOSING:TS_CONNECTED,t->close_stage?"Draining and closing chat.":"Encrypted chat connected.");
 }
 static void begin_close(ts_transfer *t) {
     if (t->close_stage) return;
     t->close_stage=CLOSE_DRAINING; t->status.closing=1;
+    t->status.message_idle_deadline=0;
     t->close_deadline=t->status.now+180000*scale(t);
     if (t->close_deadline>t->status.run_deadline) t->close_deadline=t->status.run_deadline;
     phase(t,TS_CLOSING,"Draining admitted messages before closing.");
@@ -101,6 +110,7 @@ void ts_transfer_close(ts_transfer *t, double now) {
 static void delivered(ts_transfer *t, const ts_result *r) {
     size_t i;
     for (i=0;i<r->acknowledged_count;++i) { t->status.delivered++; if (t->delivery) t->delivery(t->context,r->acknowledged[i]); }
+    if (r->acknowledged_count) message_idle(t,1);
     if (t->options.auto_close && t->options.sender && t->status.last_queued && !pending_count(t) && t->status.delivered) begin_close(t);
 }
 static int send_initial(ts_transfer *t) {
@@ -135,6 +145,7 @@ int ts_transfer_enqueue(ts_transfer *t, const uint8_t *text, size_t len, double 
     if (!t->status.active || !t->options.chat || !t->status.connected || t->close_stage || !len || len>96 || !ts_utf8_valid(text,len)) return 0;
     if (!ts_session_send(t->session,0,text,len,&p)) return 0;
     t->status.last_queued=(uint32_t)p.bytes[11]<<24 | (uint32_t)p.bytes[12]<<16 | (uint32_t)p.bytes[13]<<8 | p.bytes[14];
+    message_idle(t,1);
     if (t->options.sender && t->next_poll) t->next_poll=now;
     info(t); return 1;
 }
@@ -165,6 +176,7 @@ static void receive_turn(ts_transfer *t, const ts_result *r) {
     if (t->options.sender) {
         if (!r->reply || !t->poll_active || r->number!=t->poll.number || ((t->poll.close==TS_COMMIT)!=(r->close==TS_ACK_CLOSE))) { t->status.rejected++; return; }
         if (!r->duplicate) progress(t);
+        t->peer_pending=r->pending;
         t->poll_deadline=0; t->poll_active=0; delivered(t,r);
         if (r->close==TS_ACK_CLOSE) {
             ts_packet final;
@@ -195,6 +207,7 @@ static void receive_turn(ts_transfer *t, const ts_result *r) {
     }
     if (t->sending_turn) return;
     if (!r->duplicate) progress(t);
+    t->peer_pending=r->pending;
     t->last_peer_turn=r->number;
     if (r->close==TS_DRAIN) { begin_close(t); t->peer_closing=1; }
     if (r->close==TS_COMMIT) {
@@ -212,11 +225,12 @@ ts_transfer *ts_transfer_new(const ts_options *options, const uint8_t *text, siz
                             ts_message_callback message, ts_delivery_callback delivery, void *context) {
     ts_transfer *t; ts_packet p;
     if (!options || !ts_audio_profile_valid(options->audio_profile) || options->mode<TS_MODE_MESSAGE || options->mode>TS_MODE_CLEAR ||
-        (options->chat && options->mode!=TS_MODE_MESSAGE) || options->idle_ms<1000 || options->idle_ms>120000 ||
+        (options->chat && options->mode!=TS_MODE_MESSAGE) || options->idle_ms<1000 || options->idle_ms>3600000 ||
         (options->sender?(!len || len>96 || !ts_utf8_valid(text,len)):len!=0)) return NULL;
     t=calloc(1,sizeof(*t)); if (!t) return NULL;
     t->options=*options; t->message=message; t->delivery=delivery; t->context=context;
     t->status.active=1; t->status.now=now; t->status.run_deadline=now+(options->chat?600000:180000); progress(t);
+    if (options->idle_ms>120000 && t->status.run_deadline<now+2.0*options->idle_ms) t->status.run_deadline=now+2.0*options->idle_ms;
     if (len) memcpy(t->initial,text,len);
     t->initial_len=len;
     if (options->mode==TS_MODE_CLEAR) {
@@ -247,6 +261,7 @@ void ts_transfer_status(const ts_transfer *t, ts_status *out) {
     *out=t->status; out->pending=t->session?pending_count(t):t->status.pending;
     if (t->session) { ts_info s; ts_session_info(t->session,&s); memcpy(out->fingerprint,s.fingerprint,40); }
     if (t->status.idle_deadline<due) due=t->status.idle_deadline;
+    if (t->status.message_idle_deadline && t->status.message_idle_deadline<due) due=t->status.message_idle_deadline;
     /* Jobs are a FIFO: a control frame cannot overtake its DATA frame. */
     if (t->job_count && t->jobs[0].due<due) due=t->jobs[0].due;
     if (t->retry_due && t->retry_due<due) due=t->retry_due;
@@ -266,6 +281,10 @@ void ts_transfer_tick(ts_transfer *t, double now) {
         if (!t->options.chat && t->accepted) finish(t,TS_RECEIVED,"Received; idle timeout ended receipt-repair listening.");
         else ts_transfer_fail(t,"No new peer response before the idle timeout.");
         return;
+    }
+    if (t->status.message_idle_deadline && now>=t->status.message_idle_deadline) {
+        ts_transfer_close(t,now);
+        phase(t,TS_CLOSING,"Message idle timeout; draining and closing chat.");
     }
     if (t->transmitting) return;
     if (t->retry_due && now>=t->retry_due && t->flight_active) send_flight(t,0);
@@ -367,7 +386,7 @@ void ts_transfer_receive(ts_transfer *t, const uint8_t *bytes, size_t len, doubl
             progress(t);
             if (!t->accepted || t->options.chat) {
                 t->accepted=1; t->status.received++;
-                if (t->options.chat) connected(t); else { t->linger_deadline=now+60000; phase(t,TS_RECEIVED,"Data received; repairing a lost receipt if needed."); }
+                if (t->options.chat) { connected(t); message_idle(t,1); } else { t->linger_deadline=now+60000; phase(t,TS_RECEIVED,"Data received; repairing a lost receipt if needed."); }
                 if (t->message) t->message(t->context,mode,event.text,event.text_len,event.counter);
                 if (t->options.chat && t->options.auto_close && !t->options.sender) begin_close(t);
             }

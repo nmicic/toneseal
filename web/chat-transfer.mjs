@@ -38,9 +38,11 @@ export class ChatTransfer extends AutoTransfer {
     this._poll = null; this._response = null; this._idleRounds = 0;
     this._nextPollTimer = undefined; this._turnTimer = undefined;
     this._sendingTurn = false; this._enqueuePending = 0;
+    this._messageIdleTimer = undefined; this._messageIdleDeadline = null;
+    this._lastMessageAt = null; this._peerPending = false;
     this._admitted = new Map(); this._sentData = new Set();
     this._chatStats = {turns:0,retries:0,duplicates:0,rejectedFrames:0,delivered:0,received:0,lastDeliveryMs:null};
-    this._close = {initiator:null,localRequested:false,peerClosing:false,stage:'none',outcome:null,peerAckSeen:false,finalSeen:false,pendingAtEnd:0};
+    this._close = {initiator:null,reason:null,localRequested:false,peerClosing:false,stage:'none',outcome:null,peerAckSeen:false,finalSeen:false,pendingAtEnd:0};
     this._closeDeadline = null; this._closeTimer = undefined; this._lingerTimer = undefined;
   }
   _cleanup() {
@@ -56,6 +58,10 @@ export class ChatTransfer extends AutoTransfer {
       close:{...this._close,remainingMs:this._close.outcome?0:this._closeDeadline===null?null:Math.max(0,Math.round(this._closeDeadline-monotonic()))},
       canSend:Boolean(this._active && this._chatConnected && this._close.stage === 'none' && pendingCount + (this._enqueuePending || 0) < MAX_PENDING),
       pendingCount,maxPending:MAX_PENDING,turn:this._turn || this._lastPeerTurn || 0,
+      messageIdle:{timeoutMs:this._idleTimeoutMs,
+        remainingMs:this._active && this._messageIdleDeadline !== null ? Math.max(0,Math.round(this._messageIdleDeadline-this._now())) : null,
+        lastMessageAgeMs:this._lastMessageAt === null ? null : Math.max(0,Math.round(this._now()-this._lastMessageAt)),
+        waitingForReceipts:Boolean(this._active && this._chatConnected && !this._closing() && (this._pending() || this._peerPending))},
       chatStats:{...this._chatStats}};
   }
   async start(options = {}) {
@@ -66,6 +72,26 @@ export class ChatTransfer extends AutoTransfer {
   }
   _pending() { return (this._session?.info.pendingCount || 0) + (this._enqueuePending || 0); }
   _closing() { return this._close.stage !== 'none' && !this._close.outcome; }
+  _syncMessageIdle(activity = false) {
+    if (activity) this._lastMessageAt = this._now();
+    // Control-only keepalives prove peer liveness, not conversation activity.
+    // Pause the conversation clock until both admitted queues have drained.
+    if (!this._active || !this._chatConnected || this._closing() || this._pending() || this._peerPending) {
+      this._clearTimer(this._messageIdleTimer); this._messageIdleTimer = undefined;
+      this._messageIdleDeadline = null; return;
+    }
+    if (!activity && this._messageIdleDeadline !== null) return;
+    this._clearTimer(this._messageIdleTimer);
+    this._messageIdleDeadline = this._now()+this._idleTimeoutMs;
+    const generation = this._generation;
+    const handle = this._timer(()=>{
+      if (!this._active || generation !== this._generation || this._messageIdleTimer !== handle) return;
+      this._messageIdleTimer = undefined;
+      if (this._pending() || this._peerPending) { this._syncMessageIdle(); return; }
+      this._close.reason = 'message-idle'; this.close();
+    },this._idleTimeoutMs);
+    this._messageIdleTimer = handle;
+  }
   _emitClosing() {
     const descriptions = {
       draining:'Ending chat. Finishing admitted messages and waiting for their delivery receipts…',
@@ -74,12 +100,14 @@ export class ChatTransfer extends AutoTransfer {
       'waiting-final':'Close acknowledgement sent. Listening briefly for the final confirmation or a retry…',
       finalizing:'Peer acknowledged closing. Sending the final confirmation…',
     };
-    this._emit('closing',descriptions[this._close.stage] || 'Ending chat…');
+    const prefix = this._close.reason === 'message-idle' ? `No message activity for ${this._idleTimeoutMs/1000} seconds. ` : '';
+    this._emit('closing',prefix+(descriptions[this._close.stage] || 'Ending chat…'));
   }
   _beginClose(local) {
     if (local) this._close.localRequested = true;
     if (this._close.stage !== 'none') return;
     this._close.initiator = local ? 'local' : 'peer'; this._close.stage = 'draining';
+    this._syncMessageIdle();
     const scale = getAudioProfile(this._state.profile).timingScale;
     this._closeDeadline = Math.min(this._runStartedAt+this._timing.maxRunMs,monotonic()+this._timing.closeTimeoutMs*scale);
     const generation = this._generation;
@@ -105,7 +133,8 @@ export class ChatTransfer extends AutoTransfer {
   _finishClose(outcome,status) {
     if (!this._active) return;
     this._close = {...this._close,stage:'closed',outcome,pendingAtEnd:this._pending()};
-    this._finish('closed',status+' Microphone, playback, and session keys were released.');
+    const prefix = this._close.reason === 'message-idle' ? `Idle timeout: ${this._idleTimeoutMs/1000} seconds without message activity. ` : '';
+    this._finish('closed',prefix+status+' Microphone, playback, and session keys were released.');
   }
   _fail(error,generation=this._generation) {
     if (this._active && generation === this._generation && this._closing()) this._close = {...this._close,stage:'closed',outcome:'unconfirmed',pendingAtEnd:this._pending()};
@@ -116,8 +145,10 @@ export class ChatTransfer extends AutoTransfer {
   }
   _rejectTurn() { this._chatStats.rejectedFrames++; this._emit(); }
   _connected() {
-    if (!this._chatConnected) this._session.lockChatEpoch();
+    const first = !this._chatConnected;
+    if (first) this._session.lockChatEpoch();
     this._chatConnected = true;
+    this._syncMessageIdle(first);
     if (this._closing()) { this._emitClosing(); return; }
     this._emit('chat',this._session.info.pendingCount ? 'Chat connected. Waiting for delivery receipts; both devices can queue messages.' : 'Chat connected. Write on either device; the audio link takes turns automatically.');
   }
@@ -127,7 +158,7 @@ export class ChatTransfer extends AutoTransfer {
     if (this._closing()) throw Error('Chat is closing. No new messages can be queued.');
     if (this._session.info.pendingCount + this._enqueuePending >= MAX_PENDING) throw Error('Eight messages await receipts. Keep your draft until the queue has room.');
     const generation = this._generation;
-    this._enqueuePending++; this._emit();
+    this._enqueuePending++; this._syncMessageIdle(true); this._emit();
     try {
       const packet = await this._session.send('message',text); this._check(generation);
       const counter = new DataView(packet.buffer,packet.byteOffset,packet.byteLength).getUint32(11,false);
@@ -141,7 +172,7 @@ export class ChatTransfer extends AutoTransfer {
       }
       return {counter};
     } finally {
-      if (generation === this._generation) { this._enqueuePending--; this._emit(); }
+      if (generation === this._generation) { this._enqueuePending--; this._syncMessageIdle(); this._emit(); }
     }
   }
   async _sendMessage(generation) {
@@ -167,17 +198,21 @@ export class ChatTransfer extends AutoTransfer {
     // Receipt is embedded in the next turn. Never answer DATA independently:
     // the peer may still be sending its turn-control frame.
     this._connected();
+    this._syncMessageIdle(true);
   }
   async _handleDuplicateReceipt() { this._chatStats.duplicates++; this._emit(); }
   async _handleAck() { /* Chat v6/v7 receipts travel in authenticated turns. */ }
   _deliver(acknowledged) {
+    let delivered = false;
     for (const counter of acknowledged) {
       if (!this._admitted.has(counter)) continue;
       const durationMs = Math.max(0,Math.round(monotonic()-this._admitted.get(counter)));
       this._admitted.delete(counter); this._chatStats.delivered++;
+      delivered = true;
       this._chatStats.lastDeliveryMs = durationMs;
       this._onDelivery({counter,durationMs});
     }
+    if (delivered) this._syncMessageIdle(true);
   }
   _schedulePoll(generation,delay) {
     if (this._nextPollTimer !== undefined || !this._active) return;
@@ -239,6 +274,7 @@ export class ChatTransfer extends AutoTransfer {
       if (!result.reply || !poll || result.number !== poll.number) { this._chatStats.duplicates++; this._emit(); return; }
       if ((poll.close === 'commit') !== (result.close === 'ack')) { this._rejectTurn(); return; }
       if (!result.duplicate) this._peerProgress(generation);
+      this._peerPending = result.pending;
       this._clearTimer(this._turnTimer); this._turnTimer = undefined;
       this._poll = null;
       this._deliver(result.acknowledged); this._chatStats.turns++;
@@ -277,6 +313,7 @@ export class ChatTransfer extends AutoTransfer {
     }
     if (this._sendingTurn) return;
     if (!result.duplicate) this._peerProgress(generation);
+    this._peerPending = result.pending;
     this._lastPeerTurn = result.number; this._chatStats.turns++;
     if (result.close === 'drain') { this._beginClose(false); this._close.peerClosing = true; }
     if (result.close === 'commit') {

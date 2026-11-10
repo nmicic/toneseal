@@ -214,6 +214,7 @@ async function appCase(browser, name, options) {
       await page.waitForFunction(() => document.querySelector('#audio-visual-collapse').getAttribute('aria-expanded') === 'true');
       assert.equal(await page.locator('#auto-text').evaluate(node => document.activeElement === node), false, `${name}: expanding views dismisses composer focus`);
     }
+    const toneHeight=(await page.locator('#audio-visual-plot').boundingBox()).height;
     for (const view of views) {
       await page.locator(`#audio-view-${view}`).click();
       assert.equal(await page.locator('#audio-visual-canvas').getAttribute('data-view'), view);
@@ -221,6 +222,8 @@ async function appCase(browser, name, options) {
       metadataOnly(state, `${name}/${view}`);
       assert.equal(state.view, view);
       assert.equal(state.active, false);
+      assert.equal((await page.locator('#audio-visual-plot').boundingBox()).height,toneHeight,`${name}/${view}: plot matches Tones height`);
+      if(view==='peaks')assert.equal((await page.locator('#audio-visual-peaks').boundingBox()).height,toneHeight,`${name}: Peaks fills the full plot`);
       assert.equal(await page.locator('#mode-message').getAttribute('aria-selected'), 'true');
       assert.equal(await page.locator('#auto-text').inputValue(), 'A draft survives changing the live display.');
     }

@@ -81,7 +81,7 @@ static void help(void) {
          "  --input FILE|-               Text from file/stdin; encode/send default stdin\n"
          "  --output FILE|-              Explicit raw export; files must be new (0600)\n"
          "  --input-device ID --output-device ID\n"
-         "  --timeout SECONDS            Peer-idle deadline, 1-120 (default 60)\n"
+         "  --timeout SECONDS            Peer/message idle timeout, 1-3600 (default 60)\n"
          "  --rate 44100|48000           WAV output rate (default 48000)\n"
          "  --duration SECONDS           Audio probe length, 1-30 (default 2)\n"
          "  --json                       Structured status and message events on stdout\n"
@@ -172,7 +172,7 @@ static int parse(int argc, char **argv, options *o) {
         case OUTPUT: o->output=optarg; break;
         case INPUT_DEVICE: if (!number(optarg,0,4096,&n)) return 0; o->input_device=(int)n; break;
         case OUTPUT_DEVICE: if (!number(optarg,0,4096,&n)) return 0; o->output_device=(int)n; break;
-        case TIMEOUT: if (!number(optarg,1,120,&o->timeout)) return 0; break;
+        case TIMEOUT: if (!number(optarg,1,3600,&o->timeout)) return 0; break;
         case RATE: if (!number(optarg,44100,48000,&o->rate) || (o->rate!=44100 && o->rate!=48000)) return 0; break;
         case DURATION: if (!number(optarg,1,30,&o->duration)) return 0; break;
         case JSON: o->json=1; break;
@@ -338,7 +338,10 @@ static void status_line(context *ctx, const ts_status *s, const ts_audio_stats *
     if (ctx->options.json) {
         printf("{\"schemaVersion\":1,\"type\":\"status\",\"phase\":\"%s\",\"active\":%s,\"connected\":%s,\"verified\":%s,\"closeConfirmed\":%s,\"pending\":%zu,\"sent\":%u,\"received\":%u,\"retries\":%u,\"crcRejected\":%llu,\"audioDrops\":%llu,\"inputLevel\":%.4f,\"rate\":%u,\"idleRemainingMs\":%.0f,\"fingerprint\":",
                ts_phase_name(s->phase),s->active?"true":"false",s->connected?"true":"false",s->verified?"true":"false",s->close_confirmed?"true":"false",s->pending,s->sent,s->received,s->retries,(unsigned long long)crc,(unsigned long long)audio->dropped_samples,audio->input_peak,audio->rate,fmax(0,s->idle_deadline-s->now));
-        quote(stdout,(const uint8_t *)s->fingerprint,strlen(s->fingerprint)); fputs(",\"reason\":",stdout); quote(stdout,(const uint8_t *)s->reason,strlen(s->reason)); fputs("}\n",stdout); fflush(stdout);
+        quote(stdout,(const uint8_t *)s->fingerprint,strlen(s->fingerprint));
+        fputs(",\"messageIdleRemainingMs\":",stdout);
+        if (s->active && s->message_idle_deadline) printf("%.0f",fmax(0,s->message_idle_deadline-s->now)); else fputs("null",stdout);
+        fputs(",\"reason\":",stdout); quote(stdout,(const uint8_t *)s->reason,strlen(s->reason)); fputs("}\n",stdout); fflush(stdout);
     } else {
         fprintf(stderr,"%s: %s\n",ts_phase_name(s->phase),s->reason);
         if (s->phase==TS_VERIFY) fprintf(stderr,"Fingerprint: %s\nCompare every group on both screens. Type /confirm only if they match.\n",s->fingerprint);
@@ -468,7 +471,7 @@ int main(int argc, char **argv) {
              "\"commands\":[\"send\",\"receive\",\"chat\",\"text\",\"encode\",\"decode\",\"devices\",\"audio-probe\",\"capabilities\"],"
              "\"textConversions\":{\"actions\":[\"to-tl\",\"from-tl\",\"to-wav\",\"from-wav\"],\"encoding\":\"toneseal-text-over-sound\",\"maxTextBytes\":96,\"timelineMaxBytes\":200000,\"timelineRate\":48000,\"tlVersion\":%u,\"engineVersion\":%u,\"timelineProfiles\":[\"nearby\",\"telephone\",\"ultrasonic\"],\"wavProfiles\":[\"nearby\",\"telephone\",\"ultrasonic\"],\"profileDetection\":\"explicit\"},"
              "\"modes\":[\"message\",\"password\",\"clear\"],\"profiles\":[\"nearby\",\"telephone\",\"ultrasonic\"],\"crypto\":[\"p256\",\"x25519\"],\"maxTextBytes\":96,\"maxPending\":8,"
-             "\"peerIdleSeconds\":{\"default\":60,\"min\":1,\"max\":120},\"localCommands\":[\"/confirm\",\"/quit\",\"/stop\",\"/reveal\",\"/send TEXT\"],"
+             "\"peerIdleSeconds\":{\"default\":60,\"min\":1,\"max\":3600},\"localCommands\":[\"/confirm\",\"/quit\",\"/stop\",\"/reveal\",\"/send TEXT\"],"
              "\"events\":[\"status\",\"message\",\"password\",\"delivered\",\"encoded\",\"packet\",\"audio-level\"],\"passwordMasked\":true,\"automaticClipboard\":false,\"automaticPeerAuthentication\":false}\n",TS_TL_VERSION,TS_TL_ENGINE_VERSION);
         return fflush(stdout)==EOF || ferror(stdout)?2:0;
     }

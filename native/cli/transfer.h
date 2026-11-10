@@ -17,7 +17,7 @@ typedef struct {
     uint32_t turn,last_queued;
     size_t pending;
     unsigned sent,received,retries,rejected,delivered;
-    double now,next_due,idle_deadline,run_deadline;
+    double now,next_due,idle_deadline,message_idle_deadline,run_deadline;
     char fingerprint[40],reason[160];
 } ts_status;
 typedef struct ts_transfer ts_transfer;

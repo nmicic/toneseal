@@ -3,6 +3,7 @@
 import {payloadTimeline} from './communication-codec.mjs';
 import {getAudioProfile} from './audio-profiles.mjs';
 import {MAX_PLAYBACK_GAIN,ScreenAwake} from './audio-environment.mjs';
+import {MAX_AUDIO_RUN_MS} from './transfer-limits.mjs';
 
 export const DEFAULT_PLAYBACK_VOLUME = MAX_PLAYBACK_GAIN;
 const freshMetrics=()=>({txFrames:0,txBytes:0,rxFrames:0,rxBytes:0,
@@ -17,7 +18,7 @@ function audioSession(type){try{if(globalThis.navigator?.audioSession)navigator.
 // run. Playback never changes away from a capture-compatible Audio Session.
 export class AutoAudioLink {
   constructor({onPackets=()=>{},onStatus=()=>{},onError=()=>{},onMetrics=()=>{},profile='nearby',maxRunMs=180000}={}){
-    if(!Number.isInteger(maxRunMs)||maxRunMs<1||maxRunMs>600000)throw Error('Automatic audio must have a positive lifetime of at most ten minutes.');
+    if(!Number.isInteger(maxRunMs)||maxRunMs<1||maxRunMs>MAX_AUDIO_RUN_MS)throw Error('Automatic audio must have a positive lifetime of at most two hours.');
     this.maxRunMs=maxRunMs;
     this.profile=getAudioProfile(profile);
     this.onPackets=onPackets;this.onStatus=onStatus;this.onError=onError;this.onMetrics=onMetrics;

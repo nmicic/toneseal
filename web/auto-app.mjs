@@ -10,6 +10,7 @@ import {createAudioVisuals} from './audio-visuals.mjs';
 import {createSectionNavigation} from './section-nav.mjs';
 import {createAppView} from './app-view.mjs';
 import {installPlaybackHints} from './audio-environment.mjs';
+import {transferLifetimeMs} from './transfer-limits.mjs';
 installPlaybackHints();
 const el = id => document.getElementById(id);
 // Link telemetry updates several times per second. Keep unchanged button text
@@ -195,7 +196,8 @@ function agentSnapshot() {
       audioProfile:el('audio-profile').value,cryptoProfile:mode === 'clear'?null:el('crypto-profile').value,
       elapsedMs:state.active?Math.max(0,Date.now()-startedAt):null,
       peerIdle:state.active ? controller.state.peerIdle || null : null,
-      remainingMs:state.active?Math.max(0,(chatRun?600000:180000)-(Date.now()-startedAt)):null},
+      messageIdle:state.active && chatRun ? controller.state.messageIdle || null : null,
+      remainingMs:state.active?Math.max(0,controller.state.lifetimeMs-(Date.now()-startedAt)):null},
     trust:{encryptedModeSelected:mode!=='clear',comparisonRequired:el('verify-peer').checked && mode!=='clear',
       confirmedLocally:Boolean(state.active && state.peerVerified),
       fingerprint:state.active && mode!=='clear' ? state.fingerprint || null : null,
@@ -208,7 +210,8 @@ function agentSnapshot() {
     queue:{pending:awaitingReceipts(),encryptedPending:state.pendingCount||0,capacity:8,canEnqueue:Boolean(connected && !state.closing && state.canSend && !pendingEnqueue)},
     limits:{messageUtf8Bytes:mode==='clear'?MAX_CLEAR_TEXT_BYTES:96,retainedMessages:200,
       peerIdleTimeoutMs:Number(el('peer-idle-timeout').value),
-      chatLifetimeMs:600000,singleTransferLifetimeMs:180000,backgroundEndsSession:true},
+      chatLifetimeMs:transferLifetimeMs(600000,Number(el('peer-idle-timeout').value)),
+      singleTransferLifetimeMs:transferLifetimeMs(180000,Number(el('peer-idle-timeout').value)),backgroundEndsSession:true},
     activity:{lastTransmitAgeMs:age(lastTxAt),lastDecodedFrameAgeMs:age(lastRxAt),lastCompletedTurnAgeMs:age(lastTurnAt),lastReceiptAgeMs:age(lastReceiptAt)},
     visuals:audioVisuals?.getState() || null,
     presentation:appView?.getState() || null,
@@ -225,7 +228,7 @@ function agentSnapshot() {
       passwordDraft:'Stop the current transfer or wait for clipboard reading.',
       cryptoProfile:'End the session before changing key exchange.',audioProfile:'End the session before changing audio connection.',
       verifyPeer:'Choose verification before starting the session.',chatEnabled:'End the session before changing chat mode.',
-      peerIdleTimeout:'End the session before changing the peer response timeout.',
+      peerIdleTimeout:'End the session before changing the idle timeout.',
       clearConversation:!history.length?'No conversation to clear.':'Wait for pending receipts or end chat before clearing.',showcase:'End the session before opening a different tool.',
       manual:'End the session before navigating to manual tools.',legacy:'End the session before navigating to the original experiment.',
       guideJson:'Navigation is disabled to preserve the session. Read the inline guide or fetch the linked JSON without leaving this page.'},
@@ -240,12 +243,16 @@ function renderAgentView() {
     : 'Read the guide here, then choose a transfer tab above. Opening this guide does not start the microphone.';
 }
 function renderPeerIdle() {
-  const idle = state.active ? controller.state.peerIdle : null;
+  const current = state.active ? controller.state : null;
+  const messageIdle = chatRun && current?.connected && !current.closing ? current.messageIdle : null;
+  const idle = messageIdle || current?.peerIdle;
   const milliseconds = Number(el('peer-idle-timeout').value);
-  const duration = milliseconds === 30000 ? '30 seconds' : milliseconds === 60000 ? '1 minute' : '2 minutes';
+  const duration = milliseconds < 60000 ? `${milliseconds/1000} seconds` : milliseconds === 3600000 ? '1 hour' : `${milliseconds/60000} minute${milliseconds === 60000 ? '' : 's'}`;
   const seconds = idle?.remainingMs == null ? null : Math.max(0,Math.ceil(idle.remainingMs/1000));
-  text('peer-idle-countdown',seconds === null
-    ? `Audio stops after ${duration} without a peer response.`
+  text('peer-idle-countdown',messageIdle?.waitingForReceipts
+    ? 'Idle countdown pauses while messages await delivery receipts.'
+    : seconds === null ? `Idle timeout: ${duration} without a peer response or new chat message.`
+    : messageIdle ? `Without a new message, chat closes in ${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}.`
     : `Without another peer response, audio stops in ${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}.`);
 }
 function renderSectionNavigation() {
@@ -270,7 +277,7 @@ function renderSectionNavigation() {
 function updateElapsed() {
   if (!state.active) return;
   const elapsed = Math.max(0,Math.floor((Date.now()-startedAt)/1000));
-  const remaining = Math.max(0,(chatRun?600:180)-elapsed);
+  const remaining = Math.max(0,Math.ceil(controller.state.lifetimeMs/1000)-elapsed);
   const duration = seconds => `${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;
   const close = state.closing ? controller.state.close : null;
   el('elapsed').textContent = close?.remainingMs != null

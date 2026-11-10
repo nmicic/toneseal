@@ -46,13 +46,28 @@
     "chatLifetimeMs": 600000,
     "singleTransferLifetimeMs": 180000,
     "history": "Memory only. Changing tabs preserves an ended conversation. Starting a new transfer, Clear conversation, or hiding/leaving the page clears it. Hiding/leaving also ends the session and clears drafts. Local Stop or completed close releases audio and keys while retaining conversation rows on this page. No automatic session resume or reconnect.",
-    "modes": "Message continues as chat by default. Password and Clear text send one item per session. Clear text is unencrypted. Clipboard copy is always explicit."
+    "modes": "Message continues as chat by default. Password and Clear text send one item per session. Clear text is unencrypted. Clipboard copy is always explicit.",
+    "idleTimeoutMs": {
+      "default": 60000,
+      "min": 1000,
+      "max": 3600000,
+      "choices": [
+        30000,
+        60000,
+        120000,
+        300000,
+        600000,
+        1800000,
+        3600000
+      ]
+    },
+    "lifetimePolicy": "Normal chat/single limits are 600000/180000 ms. Idle choices above 120000 ms extend either limit to max(normal limit, 2 * idleTimeoutMs), at most 7200000 ms. Read the selected effective limits from getState().limits."
   },
   "diagnostics": {
     "navigation": "In Web view and Advanced, the right-hand page-section sidebar becomes a compact header menu on narrow screens. Use sections to open it, then the contextual section-* actions to jump to Message/Password, Verify, Status, Fingerprint/Continue, Chat/Received, About, or the Advanced sections. Only sections belonging to the current tab/state are listed. All section links only move focus and scroll: even Continue never presses the separate confirm action. navigation contains activeTarget, open and compact presentation metadata. The header explicitly names Encrypted message, Encrypted password or Unencrypted clear text; encryption labels do not imply verified peer identity.",
-    "peerIdle": "Advanced offers a local peer-response timeout of 30, 60 (default), or 120 seconds. peerIdleTimeout selects it before Start. session.peerIdle reports timeoutMs, remainingMs and lastPeerAgeMs while active; limits.peerIdleTimeoutMs reflects the selected setting. Valid new peer progress resets the countdown; local transmissions, noise and repeated packets do not. This also applies during fingerprint comparison. Healthy authenticated chat turns count as responses even when no new user message is sent. The separate three-minute single-transfer and ten-minute chat lifetime limits still apply. A timeout stops local audio and leaves messages without receipts unconfirmed.",
+    "peerIdle": "Advanced offers local idle choices of 30, 60 (default), 120, 300, 600, 1800 or 3600 seconds. peerIdleTimeout selects before Start. session.peerIdle reports timeoutMs, remainingMs and lastPeerAgeMs; new valid peer progress renews it, including during fingerprint comparison. Local retries, noise and duplicates do not. Chat keepalive turns prove liveness but do not reset session.messageIdle. Its timeoutMs, remainingMs, lastMessageAgeMs and waitingForReceipts describe conversation inactivity: actual new messages and delivery receipts renew it; pending queues pause it. On expiry, authenticated drain/close stops both peers. Each peer uses its own setting: choose the same longer value on both. Peer timeout stops local audio and leaves messages without receipts unconfirmed.",
     "location": "Link diagnostics on the transfer tab; state JSON in Advanced; read-only snapshot from any view on this page.",
-    "visuals": "Live audio stays below the composer in App view and docks to the bottom of Web view. It offers Tones (recent frequency history), Scope, Spectrum and Peaks. audioVisualCollapse expands or collapses it; audioTones/audioScope/audioSpectrum/audioPeaks choose a view. No visual control opens the microphone or sends sound. visuals contains display metadata only, never PCM or spectral arrays. Traces show local input or playback samples, not proof of peer identity or successful delivery. Stop and page hiding clear visual history.",
+    "visuals": "Live audio stays below the composer in App view and docks to the bottom of Web view. It offers Tones (recent frequency history), Scope, Spectrum and Peaks. audioVisualCollapse expands or collapses it; audioTones/audioScope/audioSpectrum/audioPeaks choose a view. No visual control opens the microphone or sends sound. visuals contains display metadata only, never PCM or spectral arrays. Traces show local input or playback samples, not proof of peer identity or successful delivery. Stop and page hiding clear visual history. All expanded views use the same plot height within a presentation/viewport; compact viewport sizing applies equally to Tones, Scope, Spectrum and Peaks.",
     "queue": "queue.pending and the UI count all outgoing messages awaiting receipts, including the first message staged during pairing. encryptedPending counts retained encrypted packets only. When eight messages await receipts, Send is disabled and the draft remains. Wait for receipts to free a slot.",
     "activity": "lastTransmitAgeMs and lastDecodedFrameAgeMs are physical transport observations, not authentication. lastCompletedTurnAgeMs reflects accepted chat turns; lastReceiptAgeMs reflects outgoing chat delivery acknowledgements. Null means none observed in this session.",
     "crc": "CRC-rejected candidates are not a packet loss percentage; decoder windows overlap. A completely missing frame need not cause a CRC error.",
@@ -70,14 +85,14 @@
   "automationBoundary": "Interactive browser agents with permission to use audio are supported. Unattended/background service operation, native CLI integration, durable queues, agent identity credentials and arbitrary binary/large-message transfer are not provided by this interface. The local synthetic testing bridge is a development tool and is never shipped in the site.",
   "closing": {
     "actions": "endChat requests graceful closure after connection. stop immediately releases local audio and keys. During setup only Stop is available. While closing, Send is disabled because admissions are frozen, not because the queue is full.",
-    "state": "session.closing and session.close report initiator (first locally observed cause), localRequested, peerClosing, stage, outcome, peerAckSeen, finalSeen, remainingMs and pendingAtEnd. A local request can cross the peer request; initiator is not proof of who pressed first globally.",
+    "state": "session.closing and session.close report reason (message-idle for automatic conversation expiry), initiator (first locally observed cause), localRequested, peerClosing, stage, outcome, peerAckSeen, finalSeen, remainingMs and pendingAtEnd. A local request can cross the peer request; initiator is not proof of who pressed first globally.",
     "outcomes": {
       "confirmed": "This device received the expected authenticated close evidence. Check peerAckSeen / finalSeen and status for the local proof; this is not a guarantee that both peers know the other has stopped.",
       "unconfirmed": "The close deadline, session lifetime or repair linger ended without all expected confirmation. Audio stops. Individual message receipts remain authoritative.",
       "aborted": "Local Stop interrupted the connection or close. The remote device may still be waiting; outstanding message delivery remains unconfirmed."
     },
     "loss": "The original initiator retries a lost COMMIT; the responder repeats its retained ACK. A lost final notice causes bounded, receive-only linger on the responder. Silence never confirms peer closure. Duplicate controls do not extend the deadline.",
-    "limits": "Closing is bounded by a close deadline and the original ten-minute session limit. remainingMs reflects the current deadline. Stop now never waits. Closing must not turn a Pending message into Delivered; only its application receipt can do that.",
+    "limits": "Closing is bounded by a close deadline and the effective session lifetime reported in limits (normally ten minutes, extended for longer idle settings). remainingMs reflects the current deadline. Stop now never waits. Closing must not turn a Pending message into Delivered; only its application receipt can do that.",
     "compatibility": "Authenticated close uses chat wire versions 6 (P-256) and 7 (X25519). Earlier chat versions 4/5 cannot join. Both peers must open the same current release. Single-transfer versions 2/3 remain unchanged."
   },
   "audioProfiles": {

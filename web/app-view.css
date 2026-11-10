@@ -153,16 +153,15 @@ body[data-experience=app][data-app-connecting=true] #composer-controls > .start-
 body[data-experience=app] #audio-visuals { position: static; flex: 0 0 auto; width: 100%; margin-top: 0; box-shadow: none; }
 body[data-experience=app] .audio-visual-inner { padding-bottom: 3px; }
 body[data-experience=app] .audio-visual-readings { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-body[data-experience=app] .audio-visual-plot { height: 28px; border-radius: 4px; }
-/* Tone history keeps its larger visual presence; compact screens use its
-   original smaller height so messages and verification still have room. */
-body[data-experience=app] #audio-visuals[data-view=tones] .audio-visual-plot { height: 54px; border-radius: 6px; }
-body[data-experience=app][data-app-compact=true] #audio-visuals[data-view=tones] .audio-visual-plot { height: 36px; }
-body[data-experience=app] .audio-visual-peaks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 1px 8px; }
+/* Every view keeps the same plot height; compact screens still leave room for
+   messages and verification without changing size when a view is selected. */
+body[data-experience=app] .audio-visual-plot { height: 54px; border-radius: 6px; }
+body[data-experience=app][data-app-compact=true] .audio-visual-plot { height: 36px; }
+body[data-experience=app] .audio-visual-peaks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 3px 8px; }
 body[data-experience=app] .audio-visual-peak { display: grid; grid-template-columns: 1fr auto; gap: 0 4px; min-height: 0; }
-body[data-experience=app] .audio-visual-peak label { font-size: 8px; }
-body[data-experience=app] .audio-visual-peak meter { grid-column: 1 / -1; grid-row: 2; height: 8px; }
-body[data-experience=app] .audio-visual-peak output { font-size: 8px; }
+body[data-experience=app] .audio-visual-peak label { font-size: 10px; }
+body[data-experience=app] .audio-visual-peak meter { grid-column: 1 / -1; grid-row: 2; height: 12px; }
+body[data-experience=app] .audio-visual-peak output { font-size: 9px; }
 
 @media (max-width: 700px) {
   .site-brand-row .site-caption { display: none; }

@@ -5,6 +5,8 @@ import {MAX_CLEAR_TEXT_BYTES, isClearPacket, encodeClearData, decodeClearPacket,
 import {AutoAudioLink} from './auto-audio-link.mjs';
 import {getAudioProfile} from './audio-profiles.mjs';
 import {getCryptoProfile, checkCryptoProfile} from './crypto-profiles.mjs';
+import {DEFAULT_PEER_IDLE_TIMEOUT_MS, MAX_PEER_IDLE_TIMEOUT_MS, transferLifetimeMs} from './transfer-limits.mjs';
+export {DEFAULT_PEER_IDLE_TIMEOUT_MS} from './transfer-limits.mjs';
 
 const DEFAULT_TIMING = Object.freeze({retryMs:8000, retryJitterMs:1000,
   turnaroundMs:500, initialDelayMs:250, maxRunMs:180000, lingerMs:60000,
@@ -12,7 +14,6 @@ const DEFAULT_TIMING = Object.freeze({retryMs:8000, retryJitterMs:1000,
 const key = bytes => Array.from(bytes, value => value.toString(16).padStart(2, '0')).join('');
 const abort = () => new DOMException('Transfer stopped.', 'AbortError');
 const monotonic = () => globalThis.performance?.now() ?? Date.now();
-export const DEFAULT_PEER_IDLE_TIMEOUT_MS = 60000;
 
 /** One message per explicit Start. Only the sender retries proactively, so the
  * receiver's responses get an uninterrupted turn. All trust decisions remain
@@ -36,7 +37,7 @@ export class AutoTransfer {
   }
 
   get state() {
-    return {...this._state, active:this._active, fingerprint:this._fingerprint,
+    return {...this._state, active:this._active, lifetimeMs:this._timing.maxRunMs, fingerprint:this._fingerprint,
       localConfirmed:this._localConfirmed, peerConfirmed:this._peerConfirmed,
       peerVerified:this._humanConfirmed,
       peerIdle:{timeoutMs:this._idleTimeoutMs,
@@ -144,7 +145,7 @@ export class AutoTransfer {
   // synchronously before the first await, preserving the browser user gesture.
   async start({mode = 'message', text = '', verifyPeer = false, volume, profile = 'nearby', cryptoProfile = 'p256', idleTimeoutMs = DEFAULT_PEER_IDLE_TIMEOUT_MS} = {}) {
     if (this._active) throw Error('Stop the current transfer before starting another.');
-    if (!Number.isSafeInteger(idleTimeoutMs) || idleTimeoutMs < 1000 || idleTimeoutMs > 120000) throw Error('Peer response timeout must be between 1 and 120 seconds.');
+    if (!Number.isSafeInteger(idleTimeoutMs) || idleTimeoutMs < 1000 || idleTimeoutMs > MAX_PEER_IDLE_TIMEOUT_MS) throw Error('Idle timeout must be between 1 and 3600 seconds.');
     const audioProfile = getAudioProfile(profile);
     const selectedCrypto = getCryptoProfile(cryptoProfile);
     if (!['message','password','clear'].includes(mode) || typeof text !== 'string') throw Error('Choose a supported mode and text.');
@@ -159,6 +160,7 @@ export class AutoTransfer {
     // A slower response needs a longer retry budget. Echo guards, turnaround,
     // human confirmation, and the absolute run limit remain wall-clock times.
     this._timing = {...this._baseTiming,
+      maxRunMs:transferLifetimeMs(this._baseTiming.maxRunMs,idleTimeoutMs),
       retryMs:this._baseTiming.retryMs * audioProfile.timingScale,
       retryJitterMs:this._baseTiming.retryJitterMs * audioProfile.timingScale};
     const generation = ++this._generation;
@@ -215,7 +217,7 @@ export class AutoTransfer {
 
   // Extension point for bounded application transfers; ordinary runs retain
   // the transport's three-minute default.
-  _transportOptions() { return {}; }
+  _transportOptions() { return this._timing.maxRunMs > DEFAULT_TIMING.maxRunMs ? {maxRunMs:this._timing.maxRunMs} : {}; }
   _createSession(cryptoProfile) { return new AudioSession({cryptoProfile}); }
 
   _jitter() { return this._timing.retryJitterMs * this._random(); }

@@ -50,7 +50,8 @@ symbols last 26.667 ms. Packet airtime increases by 33.3%; a maximum 128-byte
 wire packet takes about 5.55 seconds instead of 4.16 seconds. Encryption and
 the modem's packet format are unchanged. Retry waits account for the longer
 packets, while turnaround pauses and echo guards remain physical elapsed time. Single
-transfers are limited to three minutes, and chat connections to ten minutes.
+transfers normally have a three-minute limit, and chat connections ten minutes.
+Longer idle settings extend these limits as described below.
 
 **Near-ultrasonic · very slow (experimental)** uses 18.4–19.975 kHz tone centers
 and 40 ms symbols. A maximum packet takes 8.32 seconds. Select it on both nearby
@@ -58,7 +59,7 @@ devices, keep them still, and test a dummy Clear text example first. It may be
 inaudible, but speakers, microphone filters and loud-room clipping can prevent
 reception. It is not a telephone-call profile or proof of peer identity. The
 live Tones/Spectrum views show its actual high-frequency range. The default
-idle timeout remains one minute; Advanced offers two minutes for extra repair
+idle timeout remains one minute; Advanced offers up to one hour for extra repair
 time after lost turns. Stop before changing the selection; there is no fallback.
 
 For a first call test, use a laptop beside a speakerphone at each end of the
@@ -158,16 +159,35 @@ The receiver sends another receipt for a repeated message without displaying
 that message twice. Audio is half duplex: a device ignores its own playback and
 waits briefly before listening for the next response.
 
-Each single-transfer run is bounded to three minutes. Its receiver listens for up to
+Each single-transfer run normally has a three-minute limit. Its receiver listens for up to
 one minute after receiving a message so it can resend a lost receipt; **Stop**
 or selecting another mode ends that waiting period immediately. Wait for the
 sender's delivery confirmation before starting the next transfer. A hidden
-page, a lost microphone, or an audio interruption stops the run. Chat remains
-connected for at most ten minutes and then requires a fresh Start. Return to both
+page, a lost microphone, or an audio interruption stops the run. Chat normally
+has a ten-minute session limit and then requires a fresh Start. Return to both
 pages and press Start again, re-entering a cleared password when sending.
 Keep the devices close, use a comfortable volume, and test with dummy content
 first. A successful synthetic audio test does not establish physical iPhone or
 Android performance.
+
+**Idle timeout** in Advanced defaults to **1 minute**. Choices are 30 seconds,
+1, 2, 5, 10 or 30 minutes, and **1 hour (3,600 seconds)**. This is a local setting;
+select the same longer value on both devices. New valid peer progress renews the
+peer-response timer; local playback, noise and duplicate packets do not. It also
+applies while comparing fingerprints.
+
+Chat has a separate message-inactivity clock using the same selected timeout.
+New messages and delivery receipts renew it; empty keepalive turns do not.
+The countdown pauses while either peer has admitted messages awaiting receipts,
+then starts a full window once the queues drain. An idle chat uses the normal
+authenticated close exchange to stop both peers and release audio and keys.
+Closing can take additional audio turns; Stop now remains immediate and local.
+Unsent drafts do not count as sent messages and remain drafts after idle closing.
+
+For selections above 2 minutes, the hard session limit is the greater of its
+normal limit and **twice the selected idle timeout**. For example, a 1-hour idle
+setting allows up to 2 hours per session. A fresh Start is still required at the
+hard limit. Foreground and screen-awake restrictions continue to apply.
 
 The application's **Playback level** is fixed at 100%, separately from the phone
 or laptop's own volume. The app cannot set the device's system volume or
@@ -229,7 +249,8 @@ Password and Clear text retain their single-transfer flows.
    and closes both peers through authenticated control turns. Stop now releases
    local audio immediately. Keep both pages visible until closing finishes;
    hiding the page stops immediately and clears history. The complete session,
-   including closing, is limited to ten minutes.
+   including closing, normally has a ten-minute limit. Longer idle settings
+   extend it as described above.
 
 The original sender controls the alternating audio turns even when the other
 person sends most of the messages. An idle conversation emits occasional short

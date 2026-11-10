@@ -249,6 +249,24 @@ async function layoutMatrix(chromium,webkit,devices){
   for(const entry of cases){
     const context=await createContext(entry.browser,entry.options);await context.exposeBinding('__airSend',()=>{});
     const page=await open(context,entry.name);await checkLayout(page,entry.name,entry);await screenshot(page,entry.name);
+    let toneHeight;
+    for(const visual of ['tones','scope','spectrum','peaks']) {
+      await page.locator(`#audio-view-${visual}`).click();
+      const plot=await box(page,'#audio-visual-plot');
+      if(visual==='tones')toneHeight=plot.height;
+      assert.ok(toneHeight>=36,`${entry.name}: live plots retain their visual presence`);
+      assert.equal(plot.height,toneHeight,`${entry.name}: ${visual} matches Tones height`);
+      if(visual==='peaks') {
+        const panel=await box(page,'#audio-visual-peaks');
+        assert.equal(panel.height,toneHeight,`${entry.name}: Peaks fills the full plot`);
+        for(const selector of ['#audio-peak-microphone','#audio-peak-playback']) {
+          const meter=await box(page,selector);
+          assert.ok(meter.y>=plot.y && meter.y+meter.height<=plot.y+plot.height,`${entry.name}: Peaks meter is fully visible`);
+        }
+      }
+      if(entry.name==='webkit-390'||entry.name==='desktop-1280x640')await screenshot(page,`${entry.name}-${visual}`);
+    }
+    await page.locator('#audio-view-tones').click();
     const messageStart=await box(page,'#auto-start');
     const actionGap=(await box(page,'#audio-visuals')).y-messageStart.y-messageStart.height;
     assert.equal(await page.locator('#received-panel').isVisible(),false,`${entry.name}: Message uses one conversation area`);

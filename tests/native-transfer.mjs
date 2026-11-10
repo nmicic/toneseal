@@ -125,7 +125,7 @@ async function scenario(config){
         }
       },0);
     }
-    if(chat&&(burst||config.autoClose)&&!closing&&messages.every((list,i)=>list.length===expected[i].length)&&nativeState.pending===0&&js.state.pendingCount===0){
+    if(chat&&!config.idleClose&&(burst||config.autoClose)&&!closing&&messages.every((list,i)=>list.length===expected[i].length)&&nativeState.pending===0&&js.state.pendingCount===0){
       closing=true;clock.schedule(()=>{if(config.closeFrom==='browser')js.close();else request('close');},0);
     }
   }
@@ -189,6 +189,9 @@ configs.push(
   {name:'chat-selective-loss',mode:'chat',drop:({kind,ordinal})=>['data','poll','response'].includes(kind)&&ordinal===2},
   {name:'chat-duplicate-slow-decode',mode:'chat',nativeSender:false,duplicate:true,decodeMs:250,driftPpm:250},
   {name:'chat-browser-closes',mode:'chat',closeFrom:'browser'},
+  {name:'chat-idle-closes-both-C-sender',mode:'chat',idleClose:true},
+  {name:'chat-idle-closes-both-C-receiver',mode:'chat',nativeSender:false,idleClose:true},
+  {name:'chat-one-hour-idle-setting',mode:'chat',timeout:3600000},
   {name:'chat-C-sender-auto-close',mode:'chat',autoClose:true},
   {name:'chat-C-receiver-auto-close',mode:'chat',nativeSender:false,autoClose:true},
   {name:'chat-lost-final-C-sender',mode:'chat',loseFinal:true,drop:({kind})=>kind==='final'},

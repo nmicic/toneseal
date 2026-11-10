@@ -283,7 +283,8 @@ test('artifact policy rejects invalid input before audio and bounds transport li
   }finally{p.close();}
   assert.equal(new AutoAudioLink().maxRunMs,180000);
   assert.equal(new AutoAudioLink({maxRunMs:600000}).maxRunMs,600000);
-  for(const maxRunMs of [0,-1,600001,NaN,Infinity,1.5])assert.throws(()=>new AutoAudioLink({maxRunMs}),/ten minutes/);
+  assert.equal(new AutoAudioLink({maxRunMs:7200000}).maxRunMs,7200000);
+  for(const maxRunMs of [0,-1,7200001,NaN,Infinity,1.5])assert.throws(()=>new AutoAudioLink({maxRunMs}),/two hours/);
   const artifact=new ArtifactTransfer();assert.equal(artifact._baseTiming.maxRunMs,600000);artifact.stop();
   assert.throws(()=>new ArtifactTransfer({timing:{maxRunMs:600001}}),/ten minutes/);
   let ordinaryOptions;
