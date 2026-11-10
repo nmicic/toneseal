@@ -9,6 +9,8 @@ import {installAutomationObserver, observeActions} from './automation-observer.m
 import {createAudioVisuals} from './audio-visuals.mjs';
 import {createSectionNavigation} from './section-nav.mjs';
 import {createAppView} from './app-view.mjs';
+import {installPlaybackHints} from './audio-environment.mjs';
+installPlaybackHints();
 const el = id => document.getElementById(id);
 // Link telemetry updates several times per second. Keep unchanged button text
 // nodes stable so touch press/release events retain the same target.
@@ -151,6 +153,8 @@ async function enqueueChat() {
 }
 function renderMetrics() {
   const m = state.metrics || {}, c = state.chatStats || {};
+  const awake = {idle:'Not requested',pending:'Requesting',held:'Active',unsupported:'Unavailable',denied:'Not granted',released:'Released by device'};
+  el('metric-awake').textContent = awake[state.active ? m.screenWakeLock : 'idle'] || 'Not requested';
   el('metric-tx').textContent = `${m.txFrames || 0} / ${m.txBytes || 0}`;
   el('metric-rx').textContent = `${m.rxFrames || 0} / ${m.rxBytes || 0}`;
   el('metric-crc').textContent = String(m.crcRejectedCandidates || 0);
@@ -198,7 +202,9 @@ function agentSnapshot() {
       note:'Connected and receipt counters do not authenticate peer identity. Confirm only using an independent trusted comparison.'},
     capabilities:{secureContext:globalThis.isSecureContext,nativeCrypto:Boolean(globalThis.crypto?.subtle),
       microphoneApi:Boolean(navigator.mediaDevices?.getUserMedia),clipboardRead:Boolean(navigator.clipboard?.readText),
-      clipboardWrite:Boolean(navigator.clipboard?.writeText),compactCrypto:compactSupport,playbackLevel:1},
+      clipboardWrite:Boolean(navigator.clipboard?.writeText),compactCrypto:compactSupport,playbackLevel:1,
+      screenWakeLockApi:Boolean(navigator.wakeLock?.request)},
+    power:{screenWakeLock:state.active ? state.metrics?.screenWakeLock || 'idle' : 'idle'},
     queue:{pending:awaitingReceipts(),encryptedPending:state.pendingCount||0,capacity:8,canEnqueue:Boolean(connected && !state.closing && state.canSend && !pendingEnqueue)},
     limits:{messageUtf8Bytes:mode==='clear'?MAX_CLEAR_TEXT_BYTES:96,retainedMessages:200,
       peerIdleTimeoutMs:Number(el('peer-idle-timeout').value),

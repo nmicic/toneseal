@@ -18,7 +18,7 @@
 <p class="notice"><strong>Cleartext, unauthenticated.</strong> Anyone nearby can record or send these messages. CRC checks accidental corruption; it does not prove who sent a message. Do not send secrets. Captures stay on this device unless you choose to save them.</p>
 <section aria-labelledby="send-heading"><h2 id="send-heading">Send</h2><label for="message">Short message (up to 127 UTF-8 bytes)</label><textarea id="message" rows="3">Hello through sound</textarea><p id="bytes"></p>
 <div class="actions"><button id="prepare">Prepare synth audio</button><button id="play-message" disabled>Play message</button><button id="stop-message" disabled>Stop playback</button></div>
-<p>App playback: 100%. Use your device’s volume buttons to adjust the speaker.</p><p>Start at a comfortable level. The receiving device should start capture before you press Play.</p>
+<p>App playback: 100%. <span data-playback-hint>Use your device’s volume buttons to adjust the speaker.</span></p><p>Start at a comfortable level. The receiving device should start capture before you press Play.</p>
 <div class="actions"><button id="save-tl" disabled>Save complete TL</button><button id="save-wav" disabled>Save generated WAV</button><button id="loopback" disabled>Test generated audio locally</button></div></section>
 <section aria-labelledby="receive-heading"><h2 id="receive-heading">Receive</h2><p>Start capture, play a message on the other device, then stop and decode. Capture stops after 20 seconds. Microphone permission is requested only by Start capture.</p>
 <div class="actions"><button id="capture">Start capture</button><button id="finish-capture" disabled>Stop and decode</button><button id="cancel">Cancel current operation</button></div>

@@ -4,6 +4,10 @@
 
 Initial public-source release, prepared for publication.
 
+- Screen wake-lock requests during active browser audio, with bounded cleanup,
+  denial/release diagnostics and power state for browser automation. Shared
+  fixed-full playback gain and iPhone capture-volume guidance across tools.
+
 - Encrypted Message and Password, acknowledged Clear text, and an Advanced
   signed-enrollment showcase using platform cryptographic primitives.
 - Automatic pairing, optional full fingerprint verification, encrypted rekey,

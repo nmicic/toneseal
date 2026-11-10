@@ -7,6 +7,14 @@ and application bytes per second. Expected failures are useful test results:
 two senders or mismatched modes must stop within their bounds, without claiming
 success.
 
+`tests/audio-environment.mjs` checks screen wake-lock acquisition, denial,
+unsupported/hidden pages, external release, grants arriving after Stop, and
+replacement by a fresh run. The real automatic audio lifecycle check also
+requires locks to release on Stop, interruption and backpressure; denial must
+leave audio usable. Playback gain remains 1 in all paths. Browser layout checks
+include the compact iPhone volume hint and read-only power telemetry. These
+checks do not simulate physical iPhone speaker routing or Android screen sleep.
+
 ## Run and inspect
 
 ```sh

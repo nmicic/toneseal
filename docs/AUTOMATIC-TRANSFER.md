@@ -173,6 +173,26 @@ The application's **Playback level** is fixed at 100%, separately from the phone
 or laptop's own volume. The app cannot set the device's system volume or
 guarantee which physical speaker it uses.
 
+On iPhone/iPad, use the volume buttons **after starting** the connection, while
+the microphone is active. Select the desired system audio output before
+starting; choose its speaker if the system offers that choice. If Control Center
+hides the page during a session, return and restart both devices. Safari can change volume/routing when capture
+begins; the app keeps a capture-compatible `play-and-record` session throughout
+the run. Switching it to playback-only can interrupt the microphone. The web
+app cannot reliably force the built-in loudspeaker or set iOS system volume.
+See the [WebKit capture-volume report](https://bugs.webkit.org/show_bug.cgi?id=236219)
+and [Audio Session discussion](https://www.w3.org/2026/10/30-mediawg-minutes.html).
+
+During active capture/transfer/chat, the app requests a **screen wake lock** to
+prevent automatic screen timeout on supported browsers, including Android.
+Link diagnostics shows Screen awake: Active, Not granted, Unavailable or
+Released by device. A denied/released lock does not abort the transfer; keep the
+screen on manually or adjust the device timeout for the test. Power-saving
+settings may deny it. Stop, timeout, error, page hiding and navigation release
+the lock along with audio resources. It is not background operation: pressing
+the lock button or switching away can still stop the session. See the
+[Screen Wake Lock API](https://www.w3.org/TR/screen-wake-lock/).
+
 The manual experiment is retained at `manual.html`, with its full
 [Device 1 / Device 2 timeline](FIRST-TRANSFER.md). The original cleartext synth
 experiment remains at `communication.html`.

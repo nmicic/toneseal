@@ -55,7 +55,7 @@
     <p id="clear-warning" class="trust-note" role="note" hidden><strong>Unencrypted.</strong> Anyone who hears or records these tones may read the message. Receipts check the transfer; they do not verify identity.</p>
     <div class="profile-control"><label for="audio-profile">Audio connection</label><select id="audio-profile" aria-describedby="audio-profile-hint"><option value="nearby" selected>Nearby · faster</option><option value="telephone">Telephone · slow (experimental)</option><option value="ultrasonic">Near-ultrasonic · very slow (experimental)</option></select><p id="audio-profile-hint" class="hint">Choose the same audio connection on both devices. Nearby is for devices in the same room.</p></div>
     <p id="mode-lifecycle" class="hint"></p>
-    <p class="playback-control hint">App playback: <strong id="playback-value">100%</strong>. Use your device’s volume buttons to adjust the speaker.</p>
+    <p class="playback-control hint">App playback: <strong id="playback-value">100%</strong>. <span data-playback-hint>Use your device’s volume buttons to adjust the speaker.</span></p>
     </details>
   </section>
   <section id="progress-panel" class="progress-card" aria-labelledby="auto-phase">
@@ -74,6 +74,7 @@
     <details id="status-details" open><summary id="status-details-toggle">Connection details</summary>
     <p id="fingerprint-note" class="hint">The fingerprint stays visible as an additional check.</p>
     <details id="link-diagnostics"><summary id="link-diagnostics-toggle">Link diagnostics</summary>
+      <p class="hint">Screen awake: <span id="metric-awake">Not requested</span>. Keep this page visible.</p>
       <dl class="link-stats">
         <dt>Sent frames / bytes</dt><dd id="metric-tx">0 / 0</dd>
         <dt>Received frames / bytes</dt><dd id="metric-rx">0 / 0</dd>

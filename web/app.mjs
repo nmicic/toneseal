@@ -3,6 +3,8 @@
 import {AudioLink} from './audio-link.mjs';
 import {AudioSession, isProtocolPacket} from './session.mjs';
 import {textPayload, payloadText} from './communication-codec.mjs';
+import {installPlaybackHints} from './audio-environment.mjs';
+installPlaybackHints();
 const el = id => document.getElementById(id);
 const session = new AudioSession();
 let mode = 'message', accepting = false, working = false, generation = 0;

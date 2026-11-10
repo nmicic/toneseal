@@ -123,6 +123,11 @@ const saved=new Map(['navigator','AudioContext','AudioWorkletNode','Worker','fet
 let contextCount=0,resumeCalls=0,stopped=0,closed=0,lastContext,lastNode,lastSource,lastGain,lastBuffer;
 let gum,decoderWorker,renderJobs=0,renderWorkers=0,holdInit=false,releaseInit,suppressDecoded=false,renderPCM=pcm;
 const audioSession={type:'auto'};
+let wakeRequests=0,wakeReleases=0;
+const wakeLock={async request(type){
+  assert.equal(type,'screen');wakeRequests++;
+  return {released:false,onrelease:null,async release(){assert.equal(this.released,false);this.released=true;wakeReleases++;this.onrelease?.();}};
+}};
 const tracks=[{readyState:'live',stop(){this.readyState='ended';stopped++;}}];
 const stream={getTracks:()=>tracks};
 class Context {
@@ -158,7 +163,7 @@ class Worker {
 }
 const eventLoop=()=>new Promise(resolve=>setTimeout(resolve,0));
 try{
-  Object.defineProperty(globalThis,'navigator',{configurable:true,value:{audioSession,mediaDevices:{getUserMedia:options=>{
+  Object.defineProperty(globalThis,'navigator',{configurable:true,value:{audioSession,wakeLock,mediaDevices:{getUserMedia:options=>{
     assert.equal(audioSession.type,'play-and-record');assert.equal(options.video,false);return gum();
   }}}});
   Object.defineProperty(globalThis,'AudioContext',{configurable:true,value:Context});
@@ -172,6 +177,7 @@ try{
   assert.equal(resumeCalls,1,'audio resumes synchronously in Start');assert.ok(grant,'permission request occurs before awaiting');
   late.stop();grant(stream);await assert.rejects(starting,{name:'AbortError'});await eventLoop();
   assert.equal(tracks[0].readyState,'ended');assert.equal(audioSession.type,'auto');
+  assert.equal(wakeRequests,0,'a cancelled microphone permission cannot leave a screen lock');
   gum=async()=>{
     const freshTracks=[{readyState:'live',stop(){this.readyState='ended';stopped++;}}];
     return {getTracks:()=>freshTracks};
@@ -179,6 +185,7 @@ try{
   const received=[],errors=[],metrics=[];
   const link=new AutoAudioLink({volume:0.65,onPackets:packets=>received.push(...packets),onError:error=>errors.push(error.message),onMetrics:value=>metrics.push(value)});
   await link.start();assert.equal(link.running,true);assert.equal(contextCount,2);assert.equal(audioSession.type,'play-and-record');
+  assert.equal(link.metrics.screenWakeLock,'held','live capture holds a screen lock after permission');
   assert.equal(decoderWorker.messages.find(message=>message.type==='init').profile,'nearby');
   const context=lastContext;
   const send=link.send(packet);await eventLoop();await eventLoop();
@@ -227,6 +234,7 @@ try{
   assert.equal(new AutoAudioLink({volume:NaN}).volume,1);
   link.stop();await assert.rejects(repeat,{name:'AbortError'});
   assert.equal(link.running,false);assert.equal(link.cache.size,0);assert.equal(audioSession.type,'auto');assert.equal(errors.length,0);
+  assert.equal(link.metrics.screenWakeLock,'idle');assert.equal(wakeRequests,wakeReleases,'Stop releases the active screen lock');
   assert.equal(metrics.at(-1).inputRms,0);assert.equal(metrics.at(-1).inputPeak,0);
   assert.equal(metrics.at(-1).txFrames,1,'Stop preserves completed playback counts without counting an aborted frame');
   assert.equal(retainedRenderer.ended,true,'Stop terminates the renderer and its engine cache');
@@ -268,6 +276,10 @@ try{
   for(let i=0;i<40&&link.running;i++)lastNode.port.onmessage({data:{samples:new Float32Array(2048),startFrame:i*2048}});
   assert.equal(link.running,false,'decoder backpressure stops rather than retaining unbounded PCM');
   assert.match(errors.at(-1),/cannot decode audio fast enough/);suppressDecoded=false;
+  assert.equal(wakeRequests,wakeReleases,'interruption and backpressure paths release every screen lock');
+  const requestWake=wakeLock.request;wakeLock.request=async()=>{throw new DOMException('power saver','NotAllowedError');};
+  await link.start();assert.equal(link.running,true);assert.equal(link.metrics.screenWakeLock,'denied','power saving can deny the lock without failing audio');
+  link.stop();wakeLock.request=requestWake;
   gum=async()=>{throw new DOMException('denied','NotAllowedError');};
   await assert.rejects(link.start(),{name:'NotAllowedError'});assert.equal(link.running,false);assert.equal(audioSession.type,'auto');
   assert.ok(stopped>=3&&closed>=3);

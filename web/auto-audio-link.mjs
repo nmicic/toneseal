@@ -2,11 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 import {payloadTimeline} from './communication-codec.mjs';
 import {getAudioProfile} from './audio-profiles.mjs';
+import {MAX_PLAYBACK_GAIN,ScreenAwake} from './audio-environment.mjs';
 
-export const DEFAULT_PLAYBACK_VOLUME = 1;
+export const DEFAULT_PLAYBACK_VOLUME = MAX_PLAYBACK_GAIN;
 const freshMetrics=()=>({txFrames:0,txBytes:0,rxFrames:0,rxBytes:0,
   crcRejectedCandidates:0,invalidHeaderCandidates:0,invalidPayloadCandidates:0,
-  correctedNibbles:0,decoderErrors:0,inputRms:0,inputPeak:0,inputClippedSamples:0,playbackLevel:1});
+  correctedNibbles:0,decoderErrors:0,inputRms:0,inputPeak:0,inputClippedSamples:0,playbackLevel:MAX_PLAYBACK_GAIN,screenWakeLock:'idle'});
 const decoderMetricNames=['crcRejectedCandidates','invalidHeaderCandidates','invalidPayloadCandidates','correctedNibbles'];
 const cancelled=()=>new DOMException('Automatic audio stopped.','AbortError');
 const packetKey=packet=>Array.from(packet,value=>value.toString(16).padStart(2,'0')).join('');
@@ -26,6 +27,7 @@ export class AutoAudioLink {
     this.epoch=0;this.nextChunk=0;this.queued=new Map();this.queuedFrames=0;
     this.allowedAfter=0;this.timers=new Set();this.cancelWaiters=new Set();
     this._metrics=freshMetrics();this._metricsTimer=null;
+    this.screenAwake=new ScreenAwake({onChange:state=>{this._metrics.screenWakeLock=state;this._reportMetrics();}});
     this._visuals=null;this._visualPlayback=false;
   }
   get metrics(){return {...this._metrics};}
@@ -114,6 +116,7 @@ export class AutoAudioLink {
   });}
   stop(){
     this.generation++;this.running=false;this.busy=false;this.playing=false;
+    this.screenAwake.stop();
     this._clearVisuals();
     this.abort?.abort();this.abort=null;
     for(const stop of [...this.cancelWaiters])stop();this.cancelWaiters.clear();
@@ -160,6 +163,7 @@ export class AutoAudioLink {
       await Promise.race([Promise.all([resumed,permission]),setup]);this.check(token);
       if(context.state!=='running')throw Error('Audio could not start. Keep this page visible and tap Start again.');
       if(![44100,48000].includes(context.sampleRate))throw Error('Use an input at 44.1 or 48 kHz.');
+      void this.screenAwake.start();
       const initialized=new Promise((resolve,reject)=>{
         const worker=new Worker(new URL('./auto-decoder-worker.mjs',import.meta.url),{type:'module'});this.decoder=worker;
         worker.onerror=event=>{if(token!==this.generation)return;this._metrics.decoderErrors++;this._reportMetrics();const error=Error(event.message||'Streaming decoder failed.');reject(error);if(this.running)this.fail(error);};
@@ -265,7 +269,7 @@ export class AutoAudioLink {
       source.playbackRate.value=this.profile.playbackRate;
       // Full verified amplitude. The device's own output volume remains under
       // user control; no app setting can attenuate or amplify this signal.
-      gain.gain.value=1;source.connect(gain).connect(context.destination);this.source=source;
+      gain.gain.value=MAX_PLAYBACK_GAIN;source.connect(gain).connect(context.destination);this.source=source;
       this._connectVisualOutput(gain);
       await new Promise((resolve,reject)=>{
         const cancel=()=>{this.cancelWaiters.delete(cancel);reject(cancelled());};this.cancelWaiters.add(cancel);

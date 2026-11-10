@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import {payloadTimeline} from './communication-codec.mjs';
 import {selectEngine} from './policy.mjs';
+import {MAX_PLAYBACK_GAIN,ScreenAwake} from './audio-environment.mjs';
 
 const cancelled = () => new DOMException('Audio operation cancelled.', 'AbortError');
 function audioSessionType(type) {
@@ -15,12 +16,13 @@ export class AudioLink {
     this.generation = 0; this.prepared = null; this.busy = false;
     this.context = null; this.source = null; this.stream = null; this.captureNode = null;
     this.abort = null; this.stopWorker = null; this.stopPlayback = null; this.capture = null; this.timer = null;
-    this.volume = 1;
+    this.volume = MAX_PLAYBACK_GAIN; this.screenAwake = new ScreenAwake();
   }
   get recording() { return !!this.stream; }
   get playing() { return !!this.source; }
   check(token) { if (token !== this.generation) throw cancelled(); }
   haltMedia() {
+    this.screenAwake.stop();
     clearTimeout(this.timer); this.timer = null;
     try { this.source?.stop(); } catch {}
     this.source = null;
@@ -89,12 +91,13 @@ export class AudioLink {
     this.cancel(); const token = this.generation;
     try {
       audioSessionType('playback');
+      void this.screenAwake.start();
       const context = new AudioContext({sampleRate:48000}); this.context = context;
       await context.resume(); this.check(token);
       const pcm = this.prepared.pcm, buffer = context.createBuffer(1, pcm.length, 48000);
       buffer.getChannelData(0).set(Float32Array.from(pcm, value => value / 32768));
       const source = context.createBufferSource(), gain = context.createGain();
-      gain.gain.value = 1;
+      gain.gain.value = MAX_PLAYBACK_GAIN;
       source.buffer = buffer; source.connect(gain).connect(context.destination); this.source = source;
       await new Promise((resolve,reject) => {
         this.stopPlayback = () => reject(cancelled());
@@ -103,6 +106,7 @@ export class AudioLink {
           this.stopPlayback = null;
           this.source = null; context.close().catch(() => {}); this.context = null;
           audioSessionType('auto');
+          this.screenAwake.stop();
           this.onStatus('Playback finished.'); resolve();
         };
         source.start(); this.onStatus('Playing audio packet…');
@@ -123,6 +127,7 @@ export class AudioLink {
         noiseSuppression:false, autoGainControl:false}, video:false});
       if (token !== this.generation) { stream.getTracks().forEach(track => track.stop()); throw cancelled(); }
       this.stream = stream;
+      void this.screenAwake.start();
       const captureDeadline = Date.now() + 20000;
       // Bound media ownership even when audio setup stalls after permission.
       this.timer = setTimeout(() => {

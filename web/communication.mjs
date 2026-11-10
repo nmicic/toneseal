@@ -2,13 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 import {acousticLimits,textPayload,messageTimeline,readCaptureWav,pcmWav} from './communication-codec.mjs';
 import {selectEngine} from './policy.mjs';
+import {MAX_PLAYBACK_GAIN,ScreenAwake,installPlaybackHints} from './audio-environment.mjs';
+const screenAwake=new ScreenAwake();installPlaybackHints();
 const element=id=>document.getElementById(id),status=text=>{element('communication-status').textContent=text;};
 let generation=0,abort=null,jobCancel=null,audio=null,source=null,microphone=null,captureNode=null,captureTimeout=null;
 let prepared=null,captured=null,captureParts=[],captureFrames=0,captureRate=0,busy=false;
 function controls(){for(const id of ['prepare','capture','capture-file'])element(id).disabled=busy;
   for(const id of ['play-message','save-tl','save-wav','loopback'])element(id).disabled=busy||!prepared;
   element('stop-message').disabled=!source;element('finish-capture').disabled=!microphone;element('save-capture').disabled=busy||!captured;}
-function haltMedia(){clearTimeout(captureTimeout);captureTimeout=null;try{source?.stop();}catch{}source=null;captureNode?.disconnect();captureNode=null;
+function haltMedia(){screenAwake.stop();clearTimeout(captureTimeout);captureTimeout=null;try{source?.stop();}catch{}source=null;captureNode?.disconnect();captureNode=null;
   microphone?.getTracks().forEach(track=>track.stop());microphone=null;audio?.close().catch(()=>{});audio=null;try{if(navigator.audioSession)navigator.audioSession.type='auto';}catch{}}
 function cancel(message='Cancelled. Nothing is recording.'){generation++;abort?.abort();abort=null;jobCancel?.();jobCancel=null;haltMedia();captureParts=[];captureFrames=0;busy=false;controls();status(message);}
 function failure(error,token){if(token!==generation)return;cancel(error.message||String(error));}
@@ -35,10 +37,10 @@ async function prepare(){cancel('Preparing native synth audio…');const token=g
   } catch(error){failure(error,token);}}
 async function play(){if(!prepared||busy)return;cancel('Starting playback…');const token=generation;
   try {try{if(navigator.audioSession)navigator.audioSession.type='playback';}catch{}
-    const context=new AudioContext({sampleRate:48000});audio=context;await context.resume();if(token!==generation)return;
+    const context=new AudioContext({sampleRate:48000});audio=context;void screenAwake.start();await context.resume();if(token!==generation)return;
     const buffer=context.createBuffer(1,prepared.pcm.length,48000);buffer.getChannelData(0).set(Float32Array.from(prepared.pcm,value=>value/32768));
-    const voice=context.createBufferSource(),gain=context.createGain();gain.gain.value=1;voice.buffer=buffer;voice.connect(gain).connect(context.destination);source=voice;
-    voice.onended=()=>{if(token!==generation)return;source=null;context.close().catch(()=>{});audio=null;try{if(navigator.audioSession)navigator.audioSession.type='auto';}catch{}controls();status('Message playback finished.');};voice.start();controls();status('Playing cleartext message.');
+    const voice=context.createBufferSource(),gain=context.createGain();gain.gain.value=MAX_PLAYBACK_GAIN;voice.buffer=buffer;voice.connect(gain).connect(context.destination);source=voice;
+    voice.onended=()=>{if(token!==generation)return;source=null;screenAwake.stop();context.close().catch(()=>{});audio=null;try{if(navigator.audioSession)navigator.audioSession.type='auto';}catch{}controls();status('Message playback finished.');};voice.start();controls();status('Playing cleartext message.');
   }catch(error){failure(error,token);}}
 async function decode(samples,rate,label){cancel('Decoding '+label+'…');const token=generation;busy=true;controls();element('received').replaceChildren();
   try {const result=await workerJob('./communication-worker.mjs',{samples,rate},[samples.buffer]);if(token!==generation)return;if(!result.ok)throw Error(result.error);
@@ -50,7 +52,7 @@ async function startCapture(){cancel('Requesting microphone access…');const to
     try{if(navigator.audioSession)navigator.audioSession.type='play-and-record';}catch{}
     const context=new AudioContext({sampleRate:48000});audio=context;const resumed=context.resume();resumed.catch(()=>{});
     const stream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:false,noiseSuppression:false,autoGainControl:false},video:false});
-    if(token!==generation){stream.getTracks().forEach(track=>track.stop());return;}microphone=stream;
+    if(token!==generation){stream.getTracks().forEach(track=>track.stop());return;}microphone=stream;void screenAwake.start();
     // Bound ownership from permission grant, including suspended audio or module loading.
     let wallCutoff=()=>{if(token===generation)cancel('Microphone stopped after 20 seconds: audio setup did not finish. Try again.');};
     captureTimeout=setTimeout(()=>wallCutoff(),20000);await resumed;

@@ -59,6 +59,12 @@ The Web view button exposes longer explanations and section navigation using
 the same controls and session. Advanced contains key exchange settings,
 diagnostics, browser automation and the signed-enrollment showcase.
 
+During active audio the app requests a screen wake lock where supported, so
+automatic screen timeout need not interrupt a transfer. Stop and page hiding
+release it. Device locking, backgrounding or power-saving policy can still
+interrupt audio. Playback gain is fixed at 100%; device volume/routing remain
+under your control. On iPhone/iPad, use volume buttons after starting the connection.
+
 Later chat messages reuse the encrypted session. Each direction allows up to
 eight unacknowledged messages; a full queue pauses Send and preserves the draft.
 End chat drains admitted messages and closes through an authenticated handshake.

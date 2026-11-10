@@ -1,6 +1,11 @@
 {
   "schemaVersion": 1,
   "application": "ToneSeal",
+  "powerManagement": {
+    "state": "getState().power.screenWakeLock reports idle, pending, held, unsupported, denied or released. capabilities.screenWakeLockApi reports API presence; it does not guarantee a grant.",
+    "behavior": "Active audio requests a screen wake lock. Stop, timeout, error and page hiding release it. Power saving can deny/release it. This is not background audio or protection from manual device locking.",
+    "volume": "Application playback is fixed at 100%. System volume and the physical speaker route remain device-controlled. On iPhone/iPad adjust volume after starting capture and check the system audio output. Never infer hardware loudness from playbackLevel."
+  },
   "scope": "Automatic transfer page: Message, Password, Clear text, Advanced. Showcase and manual tools have separate interfaces.",
   "discovery": {
     "ui": "Advanced → Browser automation → Automation operation guide; Advanced stays accessible during a session.",
