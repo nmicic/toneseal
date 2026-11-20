@@ -8,13 +8,16 @@ import {AutoTransfer, DEFAULT_PEER_IDLE_TIMEOUT_MS} from '../web/auto-transfer.m
 import {ChatTransfer} from '../web/chat-transfer.mjs';
 import {AudioSession} from '../web/session.mjs';
 import {encodeClearData, clearControl} from '../web/clear-session.mjs';
+import {installProtocolClock} from './protocol-clock.mjs';
 
-const flush = () => new Promise(resolve => setImmediate(resolve));
-async function advance(t, milliseconds) {
+const clocks = new WeakMap();
+function clock(t) { clocks.set(t,installProtocolClock(t)); }
+async function advance(t,milliseconds) {
+  const drain=clocks.get(t);
+  await drain();
   t.mock.timers.tick(milliseconds);
-  // Let WebCrypto and chained protocol work finish without consuming virtual
-  // time; zero-delay turnarounds can then run at the same clock position.
-  for (let i=0;i<6;i++) {await flush();t.mock.timers.tick(0);}
+  // Run zero-delay turnarounds at this clock position.
+  for (let i=0;i<6;i++) {await drain();t.mock.timers.tick(0);}
 }
 async function settle(t, promise) {
   let done=false,value,error;
@@ -24,7 +27,6 @@ async function settle(t, promise) {
   assert.equal(done,true,'Operation settles without advancing the response deadline');
   return value;
 }
-function clock(t) {t.mock.timers.enable({apis:['setTimeout','Date'],now:0});}
 function controller(t, options={}) {
   let link;
   const events=[],sent=[],messages=[];

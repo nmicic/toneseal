@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Nenad Micic
 // SPDX-License-Identifier: Apache-2.0
 import assert from 'node:assert/strict';
-import {test} from 'node:test';
+import {protocolTest as test} from './protocol-clock.mjs';
 import {ChatTransfer} from '../web/chat-transfer.mjs';
 import {AudioSession} from '../web/session.mjs';
 
@@ -59,6 +59,13 @@ function pair({drop=()=>false,delay=0,duplicate=false,options={}}={}) {
   return {a:controllers[0],b:controllers[1],controllers,links,messages,deliveries,packets,states,
     get collisions(){return collisions;},set blocked(value){blocked=value;},
     close(){controllers.forEach(peer=>peer.stop());}};
+}
+async function pausePolling(p) {
+  // The receiver updates its turn before returning the reply. Pause only once
+  // that reply reaches the initiator and its next poll has been scheduled.
+  await until(()=>p.a._nextPollTimer!==undefined && !p.b._sendingTurn);
+  p.a._clearTimer(p.a._nextPollTimer);
+  p.a._nextPollTimer=undefined;
 }
 async function start(p,a={},b={}) {
   await p.b.start({text:'',...b});await p.a.start({text:'First chat message',...a});
@@ -206,8 +213,8 @@ test('replayed old turns and arbitrary input cannot grant a new response or rest
     await start(p);const old=p.packets.find(r=>r.kind==='poll').packet.slice();
     await until(()=>p.b.state.turn>=3);
     // Freeze only the initiator clock so there is no unrelated valid poll.
-    p.a._clearTimer(p.a._nextPollTimer);p.a._nextPollTimer=undefined;
-    await wait(15);const replies=p.packets.filter(r=>r.side===1).length;
+    await pausePolling(p);
+    const replies=p.packets.filter(r=>r.side===1).length;
     await p.b.receive([old,Uint8Array.of(0xa7,6,3,1)]);await wait(15);
     assert.equal(p.packets.filter(r=>r.side===1).length,replies);
     assert.equal(p.b.state.connected,true);assert.equal(p.messages[1].length,1);
@@ -218,8 +225,7 @@ test('old handshake replays and unsolicited rekey cannot transmit outside a chat
   const p=pair();
   try{
     await start(p);
-    p.a._clearTimer(p.a._nextPollTimer);p.a._nextPollTimer=undefined;
-    await wait(15);
+    await pausePolling(p);
     const handshake=p.packets.filter(record=>record.kind!=='data'&&record.kind!=='poll'&&record.kind!=='response');
     const before=p.packets.length;
     for(const record of handshake)await p.controllers[1-record.side].receive([record.packet]);
@@ -386,7 +392,7 @@ test('invalid close flags cannot prune receipts and the close fence rejects late
 test('authenticated out-of-order commit cannot close an open chat and old epochs remain isolated',async()=>{
   const p=pair();
   try{
-    await start(p);p.a._clearTimer(p.a._nextPollTimer);p.a._nextPollTimer=undefined;await wait(15);
+    await start(p);await pausePolling(p);
     const before=p.packets.length;
     const unexpected=await p.a._session.turn({number:p.b.state.turn+1,close:'commit'});
     await p.b.receive([unexpected]);await wait(15);

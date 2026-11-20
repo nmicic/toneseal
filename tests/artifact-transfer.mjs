@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Nenad Micic
 // SPDX-License-Identifier: Apache-2.0
 import assert from 'node:assert/strict';
-import {test} from 'node:test';
+import {protocolTest as test} from './protocol-clock.mjs';
 import {ArtifactTransfer,ArtifactAssembler,encodeArtifactFrames,MAX_ARTIFACT_BYTES} from '../web/artifact-transfer.mjs';
 import {AutoTransfer} from '../web/auto-transfer.mjs';
 import {AutoAudioLink} from '../web/auto-audio-link.mjs';
