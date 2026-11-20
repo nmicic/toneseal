@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -71,15 +72,92 @@ def renderer_support_assets(assets, entries):
     return names
 
 
-def build(assets, output):
-    assets, output = assets.resolve(), output.absolute()
-    if output.is_symlink():
-        raise ValueError('Output must be a non-symlink subdirectory of this repository.')
-    output = output.resolve()
+BUILD_INVENTORY = 'toneseal-build.json'
+
+
+def output_path(output):
+    output = output.absolute()
     if output == ROOT or not output.is_relative_to(ROOT):
-        raise ValueError('Output must be a non-symlink subdirectory of this repository.')
-    if output.parts[len(ROOT.parts):][0] in ('web', 'native', 'tests', 'scripts', '.git'):
-        raise ValueError('Output may not replace source directories.')
+        raise ValueError('Choose an output subdirectory of the ToneSeal checkout.')
+    relative = output.relative_to(ROOT)
+    protected = {'web', 'native', 'tests', 'scripts', 'docs', '.github', '.git'}
+    repository_path = any(part.casefold() == '.git' for part in relative.parts)
+    if '..' in relative.parts or repository_path or relative.parts[0].casefold() in protected:
+        raise ValueError('Output may not replace source or repository directories.')
+    current = ROOT
+    for part in relative.parts:
+        current /= part
+        if current.is_symlink() or (current.exists() and not current.is_dir()):
+            raise ValueError('Output and its parents must be directories without symlinks.')
+    if (ROOT / '.git').exists():
+        tracked = subprocess.check_output(['git', '--literal-pathspecs', 'ls-files', '-z', '--', str(relative)], cwd=ROOT)
+        if tracked:
+            raise ValueError('Selected output contains tracked source files.')
+    return output
+
+
+def site_inventory(directory):
+    """Include all files and directories. Never traverse a symlink or read a device."""
+    inventory = {}
+    for entry in directory.rglob('*'):
+        relative = entry.relative_to(directory).as_posix()
+        mode = entry.lstat().st_mode
+        if stat.S_ISREG(mode):
+            if relative != BUILD_INVENTORY:
+                inventory[relative] = hashlib.sha256(entry.read_bytes()).hexdigest()
+        elif stat.S_ISDIR(mode) and relative != BUILD_INVENTORY:
+            inventory[relative] = None
+        else:
+            raise ValueError(f'Unexpected file type in output: {relative}')
+    return inventory
+
+
+def install_site(staged, output):
+    output = output_path(output)
+    fresh = site_inventory(staged)
+    inventory = {'format': 'toneseal-static-site-v1', 'entries': fresh}
+    (staged / BUILD_INVENTORY).write_text(json.dumps(inventory, sort_keys=True, indent=2) + '\n')
+    if not output.exists():
+        staged.rename(output)
+        return
+    # Read and validate the whole existing tree before replacing it.
+    marker = output / BUILD_INVENTORY
+    if marker.is_symlink():
+        raise ValueError('Refusing a symlinked output inventory.')
+    if any(output.iterdir()):
+        if marker.is_file():
+            expected = json.loads(marker.read_text())
+            actual = {'format': inventory['format'], 'entries': site_inventory(output)}
+            if expected != actual:
+                raise ValueError('Output has changed since it was built. Move it aside or choose a fresh --out.')
+        else:
+            # Legacy dist has no inventory, so compare each byte to the staged
+            # version. A newer build may add files such as a license notice.
+            if output != ROOT / 'dist' or not (output / 'index.html').is_file():
+                raise ValueError('Output contains existing files. Move it aside or choose a fresh --out.')
+            old = site_inventory(output)
+            if not old.items() <= fresh.items():
+                raise ValueError('Existing dist differs from the build. Move it aside or choose a fresh --out.')
+    # Keep the old tree recoverable if installation or restoration fails.
+    holding = Path(tempfile.mkdtemp(prefix='.toneseal-site-', dir=output.parent))
+    previous = holding / 'previous'
+    try:
+        output.rename(previous)
+        try:
+            staged.rename(output)
+        except BaseException:
+            previous.rename(output)
+            raise
+        shutil.rmtree(previous)
+    finally:
+        if not previous.exists():
+            holding.rmdir()
+
+
+def build(assets, output):
+    assets, output = assets.resolve(), output_path(output)
+    if assets.is_relative_to(output) or output.is_relative_to(assets):
+        raise ValueError('Renderer inputs and generated output must use separate directories.')
     registry = json.loads((assets / 'engines.json').read_text())
     entries = registry.get('engines', [])
     selected = [entry for entry in entries if registry.get('default') in (entry.get('id'), entry.get('release_id'))]
@@ -121,13 +199,11 @@ def build(assets, output):
             if not destination.exists():
                 shutil.copytree(archive, destination)
         shutil.copy2(ROOT / 'LICENSE', staged / 'LICENSE')
-        synth_license = assets.parent / 'LICENSE'
-        if synth_license.is_file():
-            shutil.copy2(synth_license, staged / 'SYNTH-LICENSE')
-        # output is the explicitly selected generated directory, never a source.
-        if output.exists():
-            shutil.rmtree(output)
-        staged.rename(output)
+        for name in ('LICENSE', 'NOTICE'):
+            source = assets.parent / name
+            if source.is_file():
+                shutil.copy2(source, staged / ('SYNTH-' + name))
+        install_site(staged, output)
     print(f'Standalone web app: {output}')
 
 

@@ -6,6 +6,8 @@ import importlib.util
 import json
 from pathlib import Path
 import tempfile
+import subprocess
+from unittest.mock import patch
 import unittest
 
 spec = importlib.util.spec_from_file_location("audio_site_builder", Path(__file__).resolve().parents[1] / "scripts/build-web.py")
@@ -95,6 +97,76 @@ class RendererAssets(unittest.TestCase):
         (self.assets / "spatial-view.json").write_text(json.dumps(manifest))
         with self.assertRaisesRegex(ValueError, "does not match"):
             builder.renderer_support_assets(self.assets, self.entries)
+
+
+class OutputSafety(unittest.TestCase):
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        self.root = Path(temp.name).resolve()
+        root_patch = patch.object(builder, 'ROOT', self.root)
+        root_patch.start()
+        self.addCleanup(root_patch.stop)
+        self.dist = self.root / 'dist'
+
+    def staged(self, data='new'):
+        stage = Path(tempfile.mkdtemp(dir=self.root))
+        (stage / 'index.html').write_text(data)
+        return stage
+
+    def test_fresh_repeat_and_legacy_migration(self):
+        self.staged().rename(self.dist)
+        builder.install_site(self.staged(), self.dist)
+        self.assertTrue((self.dist / builder.BUILD_INVENTORY).is_file())
+        builder.install_site(self.staged('changed upstream'), self.dist)
+        self.assertEqual((self.dist / 'index.html').read_text(), 'changed upstream')
+
+    def test_populated_custom_and_modified_outputs_stay_intact(self):
+        custom = self.staged()
+        with self.assertRaises(ValueError):
+            builder.install_site(self.staged(), custom)
+        self.assertEqual((custom / 'index.html').read_text(), 'new')
+        builder.install_site(self.staged(), self.dist)
+        (self.dist / 'my-notes').write_text('keep')
+        with self.assertRaises(ValueError):
+            builder.install_site(self.staged(), self.dist)
+        self.assertEqual((self.dist / 'my-notes').read_text(), 'keep')
+        (self.dist / 'my-notes').unlink()
+        (self.dist / 'index.html').write_text('hand edited')
+        with self.assertRaises(ValueError):
+            builder.install_site(self.staged(), self.dist)
+        self.assertEqual((self.dist / 'index.html').read_text(), 'hand edited')
+
+    def test_source_tracked_content_and_symlinks_are_refused(self):
+        for path in ['docs', '.github', '.git', 'tests/subdir', 'out/../docs']:
+            with self.subTest(path=path), self.assertRaises(ValueError):
+                builder.output_path(self.root / path)
+        tracked = self.staged()
+        subprocess.run(['git', 'init', '-q', self.root], check=True)
+        subprocess.run(['git', 'add', str(tracked)], cwd=self.root, check=True)
+        with self.assertRaisesRegex(ValueError, 'tracked'):
+            builder.install_site(self.staged(), tracked)
+        (self.root / 'alias').symlink_to(tracked, target_is_directory=True)
+        for path in ['alias', 'alias/child']:
+            with self.subTest(path=path), self.assertRaisesRegex(ValueError, 'symlink'):
+                builder.output_path(self.root / path)
+        builder.install_site(self.staged(), self.dist)
+        (self.dist / 'extra').symlink_to(tracked, target_is_directory=True)
+        with self.assertRaisesRegex(ValueError, 'file type'):
+            builder.install_site(self.staged(), self.dist)
+        self.assertTrue((self.dist / 'extra').is_symlink())
+
+    def test_failed_publication_restores_previous_tree(self):
+        builder.install_site(self.staged('original'), self.dist)
+        stage = self.staged('replacement')
+        original_rename = Path.rename
+        def fail_install(path, target):
+            if path == stage:
+                raise OSError('cannot install')
+            return original_rename(path, target)
+        with patch.object(Path, 'rename', fail_install), self.assertRaisesRegex(OSError, 'cannot install'):
+            builder.install_site(stage, self.dist)
+        self.assertEqual((self.dist / 'index.html').read_text(), 'original')
 
 
 if __name__ == "__main__":

@@ -13,6 +13,12 @@ Any static host can serve the output while preserving relative paths. Serve
 JavaScript modules with a JavaScript MIME type, WebAssembly as `application/wasm`
 and WOFF2 fonts as `font/woff2`. Keep engine archives and their notices together.
 
+The builder writes a content inventory, `toneseal-build.json`, so subsequent
+builds can replace their own output safely. If your existing `dist/` predates
+this inventory, a rebuild adopts it when every existing file matches the build. If it differs or
+you have edited the output, move the old directory aside or choose a new
+`--out` path inside the checkout.
+
 A suitable Content-Security-Policy is:
 
 ```text
@@ -39,7 +45,9 @@ It never fetches a renderer or contacts a hosting API.
 
 The dependency includes its browser runtime support and archived engine files.
 These are generated release inputs, not a second copy of the synth source.
-Their original licenses and toolchain notices are copied into `dist/`.
+Keep the SDK’s original `LICENSE` and `NOTICE` beside its prepared `web/`
+directory when passing a bundle with `--assets`. The builder copies them to
+`SYNTH-LICENSE` and `SYNTH-NOTICE` and retains the archived toolchain notices.
 Newer prepared bundles also require the upstream `tl-document.mjs` helper,
 imported by the worker, policy and authoring modules. The builder includes that
 dependency unchanged and refuses an incomplete bundle. Older headerless-renderer

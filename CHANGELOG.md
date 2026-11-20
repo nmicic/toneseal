@@ -14,7 +14,10 @@ Initial public-source release, prepared for publication.
   bitmap receipts, exact retries and bounded half-duplex chat with authenticated
   close. Compatible P-256 and explicitly supported Compact X25519 profiles.
 - Compact App view, detailed Web view, live audio visuals, local diagnostics,
-  explicit clipboard actions and peer-idle timeout.
+  explicit clipboard actions and equally tall Tones, Scope, Spectrum and Peaks views.
+- Quiet chats close after one minute by default. Keepalive turns preserve peer
+  liveness while queued deliveries finish. Advanced and CLI `--timeout` allow
+  up to one hour of inactivity.
 - Original packet modem and portable C receiver, with sound rendered through
   the separately maintained JotTune Synth.
 - Diagnostic cleartext WAV CLI and standalone static-site build instructions.
