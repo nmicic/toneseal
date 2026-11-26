@@ -382,8 +382,9 @@ deterministic replay, byte-exact text/TL/WAV round trips, saved-hash rejection,
 WAV parsing, noisy/stereo capture and real terminal IO.
 No physical microphone is opened. On Linux, `TONESEAL_TEST_ALSA_NULL=1` additionally
 exercises real PortAudio callback capture/playback, timeout and cancellation
-using a process-local ALSA null device. It changes no machine audio configuration
-and does not prove acoustics.
+using an ALSA null device or a private PulseAudio null sink and monitor.
+On systems whose PortAudio package requires PulseAudio, install the
+`pulseaudio` executable so the test can start and stop its own server.
 
 After building web `dist/`, `npm run test:cli:pcm` compares C/browser timelines
 and waveforms and sends complete Password/chat handshakes and data through both

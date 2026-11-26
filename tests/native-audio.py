@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 Nenad Micic; SPDX-License-Identifier: Apache-2.0
-"""Opt-in Linux PortAudio lifecycle checks with a process-local ALSA null device.
+"""Opt-in Linux PortAudio lifecycle checks with isolated virtual audio devices.
 This tests callback IO/cleanup, not sound propagation or physical timing.
 """
 import json
 import os
 from pathlib import Path
+import shutil
 import signal
 import subprocess
 import sys
@@ -22,6 +23,7 @@ class Audio(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.temporary = tempfile.TemporaryDirectory(prefix='toneseal-audio-')
+        cls.addClassCleanup(cls.temporary.cleanup)
         cls.directory = Path(cls.temporary.name)
         config = cls.directory/'asound.conf'
         # An explicit raw zero source avoids depending on null-plugin buffer
@@ -31,10 +33,33 @@ class Audio(unittest.TestCase):
                           'pcm.!default { type file slave.pcm "sink" '
                           'file "/dev/null" infile "/dev/zero" format "raw" '
                           'hint { show on description "ToneSeal test null device" } }\n')
-        cls.environment = dict(os.environ, ALSA_CONFIG_PATH=str(config))
+        runtime = cls.directory/'pulse'
+        runtime.mkdir(mode=0o700)
+        socket = str(runtime/'native')
+        cls.environment = dict(os.environ, ALSA_CONFIG_PATH=str(config),
+                               PULSE_RUNTIME_PATH=str(runtime), PULSE_SERVER='unix:'+socket,
+                               PULSE_STATE_PATH=str(cls.directory/'state'),
+                               PULSE_COOKIE=str(cls.directory/'cookie'))
+        # Some PortAudio packages require a PulseAudio server even for ALSA.
+        # Give the test its own server with a null sink and its monitor as input.
+        pulse = shutil.which('pulseaudio')
+        if pulse:
+            subprocess.run([pulse, '-n', '--daemonize=yes', '--exit-idle-time=-1',
+                            '-L', 'module-null-sink sink_name=toneseal_test',
+                            '-L', 'module-native-protocol-unix socket='+socket],
+                           env=cls.environment, check=True, timeout=10)
+            cls.addClassCleanup(subprocess.run, [pulse, '--kill'], env=cls.environment,
+                                check=True, timeout=10)
 
-    @classmethod
-    def tearDownClass(cls): cls.temporary.cleanup()
+        listed = subprocess.run([CLI, 'devices', '--json'], env=cls.environment,
+                                check=True, capture_output=True, timeout=12)
+        cls.devices = json.loads(listed.stdout)
+        names = {direction: [device['name'] for device in cls.devices if device[direction]]
+                 for direction in ('defaultInput', 'defaultOutput')}
+        alsa_null = names == {'defaultInput': ['default'], 'defaultOutput': ['default']}
+        pulse_null = pulse and names == {'defaultInput': ['Default Source'], 'defaultOutput': ['Default Sink']}
+        if not (alsa_null or pulse_null):
+            raise RuntimeError(f'Expected virtual capture and playback defaults, found {names}')
 
     def command(self, *args, data=None, code=0):
         start = time.monotonic()
@@ -45,9 +70,8 @@ class Audio(unittest.TestCase):
         return [json.loads(line) for line in result.stdout.splitlines()]
 
     def test_01_device_manifest(self):
-        rows = self.command('devices', '--json')
-        self.assertGreaterEqual(len(rows[0]), 1)
-        self.assertTrue(any(device['inputs'] > 0 and device['outputs'] > 0 for device in rows[0]))
+        self.assertTrue(any(device['defaultInput'] and device['inputs'] > 0 for device in self.devices))
+        self.assertTrue(any(device['defaultOutput'] and device['outputs'] > 0 for device in self.devices))
 
     def test_02_actual_capture_callback(self):
         events = self.command('audio-probe', '--duration', '1', '--json')

@@ -41,8 +41,8 @@ workflow has not run on GitHub until the repository is pushed and Actions runs.
 
 The separate native CLI job checks out the pinned external JotTune Synth source,
 installs system OpenSSL/PortAudio development libraries, and builds/tests the
-live C client on Linux/macOS. Linux also exercises a process-local ALSA null
-backend and runs native checks under ASan/UBSan. This job requires the synth
+live C client on Linux/macOS. Linux also exercises virtual capture and playback
+through PortAudio and runs native checks under ASan/UBSan. This job requires the synth
 repository and pinned revision to be publicly available. See the
 [native CLI guide](NATIVE-CLI.md) for commands and remaining physical acceptance.
 

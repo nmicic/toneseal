@@ -64,8 +64,9 @@ Counter inspection
 is confined to a test executable, with no production counter/nonce overrides.
 
 On Linux, `TONESEAL_TEST_ALSA_NULL=1` opts into real PortAudio callback/lifecycle
-checks using a process-local ALSA null configuration. No system audio settings
-are changed. After building `dist/`, `npm run test:cli:pcm` additionally compares
+checks with virtual capture and playback devices. The fixture configures ALSA
+null and, when installed, starts a private PulseAudio server with a null sink.
+After building `dist/`, `npm run test:cli:pcm` additionally compares
 native/browser synth waveforms and routes complete protocol transfers through
 the real synths and opposite receivers. These are synthetic sound tests, not
 physical speaker/microphone or telephone acceptance. See
