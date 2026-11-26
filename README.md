@@ -5,6 +5,8 @@ provides a browser app and a native Linux/macOS C client with encrypted Message
 and Password modes, explicit Clear text, and continuing chat. The browser also
 includes a signed-enrollment showcase.
 
+[Open the ToneSeal web app](https://toneseal.me/).
+
 Sound is rendered by [JotTune Synth](https://github.com/chimepond/jottune-synth).
 ToneSeal implements its own packet encoding, audio receiver, session protocol,
 receipts and recovery. It does not use an external data-over-sound library.

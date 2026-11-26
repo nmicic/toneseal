@@ -449,7 +449,7 @@ function render() {
     button.tabIndex = selected ? 0 : -1;
     button.disabled = (state.active && (chatRun || state.phase !== 'received') && button.id !== 'mode-advanced' && button.dataset.mode !== mode) || Boolean(pendingPaste);
   });
-  for (const link of document.querySelectorAll('#advanced-options a[data-leaves-session]')) {
+  for (const link of document.querySelectorAll('a[data-leaves-session]')) {
     link.setAttribute('aria-disabled', String(Boolean(state.active)));
   }
   appView?.refresh({view:experience,advanced,mode,chatVisible:!el('chat-panel').hidden,hasReceived:Boolean(received),needsConfirmation:needConfirmation,active:Boolean(state.active),connecting:Boolean(state.active && !connected),phase:state.phase});
@@ -628,8 +628,8 @@ document.querySelectorAll('[data-mode]').forEach(button => button.onclick = () =
   passwordSendIntent = false; passwordNotice = '';
   state = {phase:'idle',active:false,fingerprint:'',role:null,status:'',metrics:state.metrics,chatStats:state.chatStats,close:state.close}; clearReceived(); renderTabChange();
 });
-for (const link of document.querySelectorAll('#advanced-options a[data-leaves-session]')) link.onclick = event => {
-  if (state.active) { event.preventDefault(); note('End this session before opening a different tool.'); }
+for (const link of document.querySelectorAll('a[data-leaves-session]')) link.onclick = event => {
+  if (state.active) { event.preventDefault(); note('End this session before opening another page.'); }
 };
 el('mode-advanced').closest('.mode-tabs').onkeydown = event => {
   const tabs = [...document.querySelectorAll('.mode-tabs [role="tab"]')];

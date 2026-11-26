@@ -17,7 +17,7 @@
     <button id="mode-clear" data-mode="clear" role="tab" aria-controls="transfer-panel" aria-selected="false" tabindex="-1">Clear text</button>
     <button id="mode-advanced" type="button" role="tab" aria-controls="advanced-options" aria-selected="false" tabindex="-1">Advanced</button>
   </div>
-    <p class="site-location site-context" aria-label="Current location"><strong id="site-location" data-protection="encrypted">Encrypted message</strong><button id="section-toggle" type="button" aria-controls="section-nav" aria-expanded="false" hidden>Sections ▾</button><span id="release-status" class="release-status">Experimental beta</span></p>
+    <p class="site-location site-context" aria-label="Current location"><strong id="site-location" data-protection="encrypted">Encrypted message</strong><button id="section-toggle" type="button" aria-controls="section-nav" aria-expanded="false" hidden>Sections ▾</button><span id="release-status" class="release-status">Experimental beta</span><a class="source-link" href="https://github.com/nmicic/toneseal" aria-label="ToneSeal source on GitHub" data-leaves-session>GitHub</a></p>
   </div>
 </header>
 <nav id="section-nav" aria-label="Page sections" hidden>
@@ -156,7 +156,7 @@
   </div>
   <section id="about-toneseal" class="about-card" aria-labelledby="about-title">
     <h2 id="about-title">About ToneSeal</h2>
-    <p><strong>Our own audio modem, from bytes to sound and back.</strong> ToneSeal implements its encoding, packet format and receiver without an external data-over-sound library. Sound is rendered through <strong>JotTune Synth</strong>, the integer synthesizer created by Nenad Micic.</p>
+    <p><strong>Our own audio modem, from bytes to sound and back.</strong> ToneSeal implements its encoding, packet format and receiver without an external data-over-sound library. Sound is rendered through <strong>JotTune Synth</strong>, the integer synthesizer created by <a href="https://www.nmic.app" data-leaves-session>Nenad Micic</a>.</p>
     <p>Each encoded byte becomes a precisely timed pattern of four related tones. A local receiver evaluates the complete pattern, repairs recoverable errors and checks the packet before passing it to the message protocol.</p>
     <details id="modem-guide">
       <summary id="modem-guide-toggle">How bytes become sound</summary>
